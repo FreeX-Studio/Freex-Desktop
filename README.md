@@ -46,14 +46,27 @@ Microsoft Edge WebView2 Runtime if it is missing (only needed on older Windows 1
 > file. Click **More info** and then **Run anyway** to install. (A signed installer is planned; even then, SmartScreen
 > may warn for new versions until they have been downloaded often enough.)
 
-**Linux (Debian, Ubuntu):** install `freex-desktop_<version>_amd64.deb`:
+**Linux (Debian, Ubuntu):** install from the MirraNET APT repository at `apt.mirranet.de` (Debian 12+, Ubuntu
+22.04+). First import its signing key, then add the repository and install; every new build arrives with
+`sudo apt upgrade`:
 
 ```bash
-sudo apt install ./freex-desktop_<version>_amd64.deb
+# Signing key of the repository
+sudo install -d /etc/apt/keyrings
+sudo curl -fsSL https://apt.mirranet.de/mirranet.gpg -o /etc/apt/keyrings/mirranet.gpg
+
+# Repository and package
+echo "deb [signed-by=/etc/apt/keyrings/mirranet.gpg] https://apt.mirranet.de stable main" \
+    | sudo tee /etc/apt/sources.list.d/mirranet.list
+sudo apt update && sudo apt install freex-desktop
 ```
 
-It brings mpv and WebKitGTK from the distribution and recommends the GStreamer plugins for the built-in FreeX
-player and `mpv-mpris` for the media keys. FreeX then is in the application menu.
+The repository is the same as for FreeX Media Server; if it is already set up, `sudo apt install freex-desktop` is
+enough. Without the repository, install a package file from your CI with
+`sudo apt install ./freex-desktop_<version>_amd64.deb`.
+
+The package brings mpv and WebKitGTK from the distribution and recommends the GStreamer plugins for the built-in
+FreeX player and `mpv-mpris` for the media keys. FreeX then is in the application menu.
 
 Start FreeX, enter the address of your server and sign in. Sign-ins are kept per server, as in a browser.
 
@@ -95,7 +108,7 @@ rustup target add x86_64-pc-windows-gnu
 
 # Linux: the app and the Debian package
 (cd src-tauri && cargo build --release --locked --features custom-protocol)
-packaging/deb/build-deb.sh 1.1.0 src-tauri/target/release/freex-desktop dist
+packaging/deb/build-deb.sh 1.1.1 src-tauri/target/release/freex-desktop dist
 
 # Windows (cross-compiled): the app and the installer
 packaging/windows/build.sh            # dist/freex-desktop-<version>-setup.exe
@@ -105,7 +118,10 @@ packaging/windows/build.sh --app      # only dist/freex-desktop.exe
 The Windows script downloads mpv and Microsoft's WebView2 bootstrapper once into `~/.cache/freex-build`; set
 `MPV_SHA256` and `WEBVIEW2_SHA256` to pin them. A distribution toolchain without the Windows standard library but
 with `rust-src` also works (the script then builds the standard library from source). The `Jenkinsfile` checks
-(rustfmt, Clippy), tests and builds both and archives the `.deb`, the setup and the plain Windows app.
+(rustfmt, Clippy), tests and builds both and archives the `.deb`, the setup and the plain Windows app. Every build
+gets its own package version (`1.1.1+202611142030.gitabc1234`), and builds of `main` go into the APT repository with
+`packaging/apt/publish.sh` (set up in Jenkins with `APT_REPO`, `APT_HOST` and optionally `APT_SUITE`). The package
+asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
 
 ### Project structure
 
@@ -120,6 +136,7 @@ with `rust-src` also works (the script then builds the standard library from sou
 | `ui/` | The server picker (plain HTML, CSS and JavaScript) |
 | `packaging/windows/` | Installer (NSIS) and build script |
 | `packaging/deb/` | Debian package: menu entry, AppStream data, build script |
+| `packaging/apt/` | Publishing to the MirraNET APT repository (same script as FreeX Media Server) |
 
 ### How it works
 
