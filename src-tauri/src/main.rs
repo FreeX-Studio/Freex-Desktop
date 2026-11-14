@@ -78,11 +78,22 @@ fn main() {
     app.run(|app, event| match event {
         RunEvent::WindowEvent {
             label,
-            event: WindowEvent::CloseRequested { .. },
+            event: WindowEvent::CloseRequested { api, .. },
             ..
         } if label == "main" => {
             save_geometry(app);
+            // macOS: closing the window keeps the app running (as Mac apps do); the Dock icon
+            // brings it back, and Cmd+Q quits.
+            if cfg!(target_os = "macos") {
+                api.prevent_close();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_fullscreen(false);
+                    let _ = window.hide();
+                }
+            }
         }
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen { .. } => show_main(app),
         RunEvent::Exit => {
             if let Some(state) = app.try_state::<AppState>() {
                 state.mpv.stop();
@@ -106,6 +117,13 @@ fn user_agent() -> Option<String> {
         Some(format!(
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) \
              Version/17.0 Safari/605.1.15 {app}"
+        ))
+    } else if cfg!(target_os = "macos") {
+        // WKWebView leaves out Safari's tokens; FreeX Web then knows it as Safari on macOS
+        // (native HLS).
+        Some(format!(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \
+             Version/18.0 Safari/605.1.15 {app}"
         ))
     } else {
         None
@@ -293,7 +311,8 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     let mut tray = TrayIconBuilder::with_id(TRAY)
         .tooltip("FreeX")
         .menu(&menu)
-        .show_menu_on_left_click(false)
+        // In the macOS menu bar a click opens the menu; elsewhere it shows the window.
+        .show_menu_on_left_click(cfg!(target_os = "macos"))
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
             match id {

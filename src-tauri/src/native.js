@@ -14,8 +14,9 @@
  * Runs in every page of the main window (the server picker and FreeX Web of each server) before
  * the page's own scripts. It makes the web view behave like an app window instead of a browser:
  * no browser context menu, no print/find/view-source shortcuts, F11 for full screen of the
- * window, Alt+Left/Right for back and forward, and no dragging of images and links out of the
- * window. Pages handle their own keys first; this only acts on keys a page left alone.
+ * window, Alt+Left/Right (Cmd+[ and Cmd+] on macOS) for back and forward, and no dragging of
+ * images and links out of the window. Pages handle their own keys first; this only acts on keys
+ * a page left alone.
  *
  * While mpv plays inside the window (the app sets window.__FREEX_MPV_EMBEDDED__), the keyboard
  * still belongs to the web view, so every key goes to mpv instead of the page.
@@ -106,6 +107,10 @@
         } else if (e.altKey && !ctrl && (key === "ArrowLeft" || key === "ArrowRight") && !editable(e.target)) {
             e.preventDefault();
             if (key === "ArrowLeft") history.back(); else history.forward();
+        } else if (e.metaKey && !e.altKey && (key === "[" || key === "]")) {
+            // macOS: Cmd+[ and Cmd+] go back and forward.
+            e.preventDefault();
+            if (key === "[") history.back(); else history.forward();
         } else if (ctrl && !e.altKey && BROWSER_KEYS.has(key)) {
             e.preventDefault();
         } else if (key === "F3" || key === "F7" || key === "F12" || (ctrl && e.shiftKey && (key === "i" || key === "j" || key === "c"))) {

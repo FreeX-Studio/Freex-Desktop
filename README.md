@@ -10,12 +10,12 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: LGPL-3.0" src="https://img.shields.io/badge/license-LGPL--3.0-blue"></a>
-  <img alt="Windows and Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-0078d4">
+  <img alt="Windows, Linux and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-0078d4">
   <img alt="Tauri 2" src="https://img.shields.io/badge/tauri-2-ffc131">
 </p>
 
 FreeX Desktop is the desktop app for [FreeX Media Server](https://github.com/FreeX-Studio/Freex-Media-Server),
-for Windows and Linux. It connects to your server and shows FreeX Web, the interface of the server itself, in its
+for Windows, Linux and macOS. It connects to your server and shows FreeX Web, the interface of the server itself, in its
 own window – so the app always matches the version of the server it talks to. Around it, the app behaves like a
 native program:
 
@@ -25,9 +25,10 @@ native program:
 - **Plays every file directly with mpv, inside the app window** – optionally, videos play in [mpv](https://mpv.io),
   which decodes practically every format itself. The server does not have to convert anything; your position and
   watch state are saved on the server as usual, and the playback shows up in the activity view. mpv draws into
-  the FreeX window (on Windows and on Linux with X11; on Wayland it opens its own window).
-- **Media keys** for mpv (Windows media overlay; on Linux through `mpv-mpris`).
-- **An app, not a browser** – dark title bar, F11 for full screen, Alt+← / Alt+→ for back and forward, no
+  the FreeX window (on Windows and on Linux with X11; on Wayland and macOS it opens its own window).
+- **Media keys** for mpv (Windows media overlay; on Linux through `mpv-mpris`; on macOS built into mpv).
+- **An app, not a browser** – dark title bar, F11 for full screen, Alt+← / Alt+→ (Cmd+[ / Cmd+] on macOS) for
+  back and forward, no
   browser context menu and no browser shortcuts (print, find, view source), a tray icon, one running instance and
   remembered window size.
 
@@ -68,13 +69,24 @@ enough. Without the repository, install a package file from your CI with
 The package brings mpv and WebKitGTK from the distribution and recommends the GStreamer plugins for the built-in
 FreeX player and `mpv-mpris` for the media keys. FreeX then is in the application menu.
 
+**macOS:** open `freex-desktop-<version>-macos.dmg` and drag **FreeX** to **Applications**. The app runs on Apple
+silicon and Intel Macs. For playback in mpv, install it with [Homebrew](https://brew.sh) (`brew install mpv`) or put
+`mpv.app` into Applications; without mpv, FreeX uses its built-in player. On the first connection macOS asks
+whether FreeX may find devices in your local network – allow it, otherwise FreeX cannot reach a server at home.
+
+> [!NOTE]
+> **"FreeX" cannot be opened / Apple could not verify it:** the app is not signed with an Apple Developer ID yet, so
+> Gatekeeper blocks the first start after a download. Open **System Settings → Privacy & Security**, scroll down to
+> the message about FreeX and click **Open Anyway** (then confirm with your password). This is needed only once
+> per version.
+
 Start FreeX, enter the address of your server and sign in. Sign-ins are kept per server, as in a browser.
 
-| What | Windows | Linux |
-|---|---|---|
-| Program | `C:\Program Files\FreeX Desktop` (with `mpv\`) | `/usr/bin/freex-desktop` (mpv from the system) |
-| Settings (servers, player, window) | `%APPDATA%\de.mirranet.freex.desktop\settings.json` | `~/.config/de.mirranet.freex.desktop/settings.json` |
-| Web view data (sign-ins, cache) | `%LOCALAPPDATA%\de.mirranet.freex.desktop` | `~/.local/share/de.mirranet.freex.desktop` |
+| What | Windows | Linux | macOS |
+|---|---|---|---|
+| Program | `C:\Program Files\FreeX Desktop` (with `mpv\`) | `/usr/bin/freex-desktop` (mpv from the system) | `/Applications/FreeX.app` (mpv from Homebrew or `mpv.app`) |
+| Settings (servers, player, window) | `%APPDATA%\de.mirranet.freex.desktop\settings.json` | `~/.config/de.mirranet.freex.desktop/settings.json` | `~/Library/Application Support/de.mirranet.freex.desktop/settings.json` |
+| Web view data (sign-ins, cache) | `%LOCALAPPDATA%\de.mirranet.freex.desktop` | `~/.local/share/de.mirranet.freex.desktop` | `~/Library/WebKit/de.mirranet.freex.desktop` |
 
 Updates install over the old version and keep all settings.
 
@@ -89,17 +101,20 @@ Updates install over the old version and keep all settings.
   screen and, pressed again, stops; the position is saved. *Play inside the FreeX window* in the app settings
   switches back to mpv's own window.
 - mpv reads your own `mpv.conf` and scripts as usual (`%APPDATA%\mpv`, `~/.config/mpv`).
+- **macOS:** closing the window keeps FreeX running, as Mac apps do; click its Dock icon to bring it back, and
+  quit with Cmd+Q. The FreeX icon in the menu bar has the same menu as the tray on Windows and Linux.
 
 ## Requirements
 
 - Windows 10 (1809 or later) or Windows 11, 64-bit
 - Linux: 64-bit with WebKitGTK 4.1 (2.40 or newer), e.g. Debian 12, Ubuntu 22.04 or newer
+- macOS 11 (Big Sur) or newer, Apple silicon or Intel
 - FreeX Media Server 0.14.0 or newer (for the mpv player; older servers work with the FreeX player)
 
 ## Building
 
-The app is built with [Tauri 2](https://tauri.app) (Rust). Both versions are built on Linux, so they fit into the
-same Jenkins as the server:
+The app is built with [Tauri 2](https://tauri.app) (Rust). The Linux and Windows versions are built on Linux, so they
+fit into the same Jenkins as the server; the macOS version is built on a Mac:
 
 ```bash
 sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
@@ -113,6 +128,9 @@ packaging/deb/build-deb.sh 1.1.1 src-tauri/target/release/freex-desktop dist
 # Windows (cross-compiled): the app and the installer
 packaging/windows/build.sh            # dist/freex-desktop-<version>-setup.exe
 packaging/windows/build.sh --app      # only dist/freex-desktop.exe
+
+# macOS (on a Mac with Xcode or the Command Line Tools): universal app, .dmg and .zip
+packaging/macos/build.sh
 ```
 
 The Windows script downloads mpv and Microsoft's WebView2 bootstrapper once into `~/.cache/freex-build`; set
@@ -122,6 +140,9 @@ with `rust-src` also works (the script then builds the standard library from sou
 gets its own package version (`1.1.1+202611142030.gitabc1234`), and builds of `main` go into the APT repository with
 `packaging/apt/publish.sh` (set up in Jenkins with `APT_REPO`, `APT_HOST` and optionally `APT_SUITE`). The package
 asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
+The last stage builds the Mac app on the Jenkins node `Spark` and archives its `.dmg` and `.zip`. Without settings
+the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `MACOS_NOTARY_PROFILE` (stored with
+`xcrun notarytool store-credentials`) the script signs and notarizes it, and Gatekeeper no longer asks.
 
 ### Project structure
 
@@ -132,9 +153,10 @@ asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the 
 | `src-tauri/src/mpv.rs` | Playback in mpv over its JSON IPC, inside the app window |
 | `src-tauri/src/native.js` | Runs in every page: app instead of browser behaviour, keys for mpv |
 | `src-tauri/src/store.rs` | `settings.json` |
-| `src-tauri/icons/` | App icons; `app-icon.svg` is the source of the PNG icons |
+| `src-tauri/icons/` | App icons; `app-icon.svg` is the source of the PNG icons, `app-icon-macos.svg` of `icon.icns` |
 | `ui/` | The server picker (plain HTML, CSS and JavaScript) |
 | `packaging/windows/` | Installer (NSIS) and build script |
+| `packaging/macos/` | `Info.plist` and build script of the Mac app (`.app`, `.dmg`) |
 | `packaging/deb/` | Debian package: menu entry, AppStream data, build script |
 | `packaging/apt/` | Publishing to the MirraNET APT repository (same script as FreeX Media Server) |
 

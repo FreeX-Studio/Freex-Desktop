@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleDisplayName</key>
+    <string>FreeX</string>
+    <key>CFBundleExecutable</key>
+    <string>freex-desktop</string>
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>de.mirranet.freex.desktop</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>FreeX</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>[[version]]</string>
+    <key>CFBundleVersion</key>
+    <string>[[build]]</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>de</string>
+    </array>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.entertainment</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 MirraNET, Niklas Linz</string>
+    <!-- FreeX servers are often reached over plain HTTP in the home network. -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+    <!-- Asked for once by macOS (Local Network privacy) before FreeX may reach the server. -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>FreeX connects to your FreeX Media Server in your home network.</string>
+</dict>
+</plist>

@@ -24,8 +24,8 @@
 //! the full screen of the app window, and Esc first leaves full screen and then stops. The
 //! keyboard stays with the web view (GTK keeps the X11 focus on its own window), so the page
 //! hands key presses to mpv while it plays there ([`mpv_key`], see `native.js`). On
-//! Wayland, which cannot embed a foreign window, and when turned off in the settings, mpv opens
-//! its own window as before.
+//! Wayland, which cannot embed a foreign window, on macOS (mpv only embeds through libmpv
+//! there) and when turned off in the settings, mpv opens its own window as before.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -87,9 +87,35 @@ pub fn find() -> Option<PathBuf> {
     if let Some(path) = bundled.filter(|p| p.is_file()) {
         return Some(path);
     }
-    std::env::split_paths(&std::env::var_os("PATH")?)
-        .map(|dir| dir.join(exe))
+    let on_path = std::env::var_os("PATH")
+        .map(|path| {
+            std::env::split_paths(&path)
+                .map(|dir| dir.join(exe))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    on_path
+        .into_iter()
+        .chain(macos_places())
         .find(|p| p.is_file())
+}
+
+/// macOS: apps started from the Finder or the Dock do not get the shell's PATH, so the usual
+/// places of mpv are looked at directly: Homebrew (Apple silicon and Intel) and mpv.app.
+fn macos_places() -> Vec<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return Vec::new();
+    }
+    let mut places = vec![
+        PathBuf::from("/opt/homebrew/bin/mpv"),
+        PathBuf::from("/usr/local/bin/mpv"),
+        PathBuf::from("/opt/local/bin/mpv"), // MacPorts
+        PathBuf::from("/Applications/mpv.app/Contents/MacOS/mpv"),
+    ];
+    if let Some(home) = std::env::var_os("HOME") {
+        places.push(PathBuf::from(home).join("Applications/mpv.app/Contents/MacOS/mpv"));
+    }
+    places
 }
 
 /// Native handle of the app window that mpv can draw into (`--wid`): a Win32 window or an X11
