@@ -119,6 +119,8 @@ EOF
             steps {
                 sh '''
                     export PATH="$HOME/.cargo/bin:$PATH"
+                    # rustup may have been installed with the minimal profile; adds what is missing.
+                    rustup component add clippy rustfmt
                     rm -rf dist
                     (cd src-tauri && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked)
                     packaging/macos/build.sh "$BUILD_NUMBER"
