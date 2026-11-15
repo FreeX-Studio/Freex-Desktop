@@ -71,6 +71,11 @@ impl AppState {
         self.open_server.lock().unwrap().clone()
     }
 
+    /// The normal window was closed (TV mode): no server is shown any more.
+    pub fn forget_open_server(&self) {
+        *self.open_server.lock().unwrap() = None;
+    }
+
     /// True if the URL may be shown in the main window: the picker or a known server.
     pub fn allowed_in_window(&self, url: &Url) -> bool {
         if is_local(url) {
@@ -270,11 +275,10 @@ pub fn set_auto_connect(state: State<'_, AppState>, enabled: bool) {
 }
 
 /// Goes back to the server picker, which then does not connect automatically.
+/// Async: from the TV mode it opens the normal window again, and opening a window from a
+/// synchronous command deadlocks on Windows (WebView2).
 #[tauri::command]
-pub fn show_servers<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn show_servers(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     state.mpv.stop();
     // From the TV mode (the settings window): back to the normal window first.
     crate::tv::leave(&app);

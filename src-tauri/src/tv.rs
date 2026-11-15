@@ -130,9 +130,10 @@ enum Command {
 
 // ---------------------------------------------------------------------------- windows
 
-/// Turns the TV mode on: the video window with mpv, the TV interface on top, the normal window
-/// hidden. If it is on already, its window comes to the front.
-pub fn enter<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+/// Turns the TV mode on: the video window with mpv, the TV interface on top. The normal window
+/// is closed (FreeX Web does not keep running behind the TV mode); [`leave`] opens it again. If
+/// the TV mode is on already, its window comes to the front.
+pub fn enter(app: &AppHandle) -> Result<(), String> {
     if !available() {
         return Err("the TV mode is not available on this system".into());
     }
@@ -155,7 +156,7 @@ pub fn enter<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         .get_webview_window("main")
         .and_then(|w| w.current_monitor().ok().flatten())
         .or_else(|| app.primary_monitor().ok().flatten());
-    let cover = |w: &tauri::WebviewWindow<R>| {
+    let cover = |w: &tauri::WebviewWindow| {
         if let Some(m) = &screen {
             let _ = w.set_position(*m.position());
             let _ = w.set_size(*m.size());
@@ -169,38 +170,39 @@ pub fn enter<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         }
     };
 
-    // macOS: mpv in its own window (see the top of the file); elsewhere the video window.
+    // macOS: mpv in its own window (see the top of the file); elsewhere the video window. Both
+    // windows are built hidden and only shown once everything is in place, so a failure on the
+    // way never leaves a black full-screen window behind and keeps the normal window.
     let video = if cfg!(target_os = "macos") {
         None
     } else {
-        let video = WebviewWindowBuilder::new(app, VIDEO, WebviewUrl::App("tv-video.html".into()))
-            .title("FreeX TV")
-            .decorations(false)
-            .fullscreen(true)
-            .skip_taskbar(true)
-            .focused(false)
-            .background_color(tauri::window::Color(0, 0, 0, 0xff))
-            .build()
-            .map_err(|e| e.to_string())?;
-        cover(&video);
-        if crate::mpv::window_id(&video).is_none() {
-            let _ = video.close();
-            return Err("mpv cannot draw into a window on this system".into());
-        }
-        Some(video)
+        Some(
+            WebviewWindowBuilder::new(app, VIDEO, WebviewUrl::App("tv-video.html".into()))
+                .title("FreeX TV")
+                .decorations(false)
+                .visible(false)
+                .skip_taskbar(true)
+                .focused(false)
+                .background_color(tauri::window::Color(0, 0, 0, 0xff))
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
     };
-    let wid = video.as_ref().and_then(crate::mpv::window_id);
-
-    let (tx, rx) = mpsc::unbounded_channel();
-    *state.tv.player.lock().unwrap() = Some(tx);
-    let player_app = app.clone();
-    tauri::async_runtime::spawn(async move { supervise(player_app, mpv, wid, rx).await });
+    let abort = |video: Option<tauri::WebviewWindow>, e: String| -> Result<(), String> {
+        if let Some(video) = video {
+            let _ = video.destroy();
+        }
+        if let Some(ui) = app.get_webview_window(UI) {
+            let _ = ui.destroy();
+        }
+        Err(e)
+    };
 
     let bridge = BRIDGE_JS.replace("__FREEX_TV_INFO__", &bridge_info(app).to_string());
     let builder = WebviewWindowBuilder::new(app, UI, WebviewUrl::App("tv/index.html".into()))
         .title("FreeX")
         .decorations(false)
-        .fullscreen(!cfg!(target_os = "macos"))
+        .visible(false)
         .shadow(false)
         .transparent(true)
         .background_color(tauri::window::Color(0, 0, 0, 0))
@@ -209,48 +211,77 @@ pub fn enter<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         .zoom_hotkeys_enabled(false);
     let builder = match &video {
         // Owned by the video window: always above it, minimized and restored together.
-        Some(video) => builder.parent(video).map_err(|e| e.to_string())?,
+        Some(video) => match builder.parent(video) {
+            Ok(b) => b,
+            Err(e) => return abort(video.clone().into(), e.to_string()),
+        },
         // mpv's own window (macOS): the TV window floats above it.
         None => builder.always_on_top(true),
     };
     let ui = match builder.build() {
         Ok(ui) => ui,
-        Err(e) => {
-            state.tv.stop();
-            if let Some(video) = video {
-                let _ = video.close();
-            }
-            return Err(e.to_string());
-        }
+        Err(e) => return abort(video, e.to_string()),
     };
-    cover(&ui);
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.hide();
+
+    // The video window on screen: only now X11 has a window for mpv to draw into.
+    if let Some(video) = &video {
+        let _ = video.show();
+        cover(video);
     }
+    let wid = video.as_ref().and_then(crate::mpv::window_id);
+    if video.is_some() && wid.is_none() {
+        return abort(video, "mpv cannot draw into a window on this system".into());
+    }
+
+    let (tx, rx) = mpsc::unbounded_channel();
+    *state.tv.player.lock().unwrap() = Some(tx);
+    let player_app = app.clone();
+    tauri::async_runtime::spawn(async move { supervise(player_app, mpv, wid, rx).await });
+
+    // Everything is in place: the normal window goes (its place is kept for later), the TV
+    // interface comes on top.
+    if let Some(main) = app.get_webview_window("main") {
+        crate::save_geometry(app);
+        let _ = main.destroy();
+        state.forget_open_server();
+    }
+    let _ = ui.show();
+    cover(&ui);
     let _ = ui.set_focus();
     crate::refresh_tray(app);
     Ok(())
 }
 
-/// Turns the TV mode off: mpv ends, both windows close, the normal window comes back.
-pub fn leave<R: Runtime>(app: &AppHandle<R>) {
+/// Turns the TV mode off: the normal window opens again (directly with the last server), then mpv
+/// ends and both windows of the TV mode close.
+pub fn leave(app: &AppHandle) {
     let state = app.state::<AppState>();
     let was_on = state.tv.active();
     state.tv.stop();
+    if was_on {
+        match app.get_webview_window("main") {
+            Some(main) => {
+                let _ = main.show();
+                let _ = main.set_focus();
+            }
+            None => {
+                if let Err(e) = crate::create_main_window(app, true) {
+                    eprintln!("FreeX Desktop: no window after the TV mode: {e}");
+                }
+                // Straight back to the server it showed before (the picker checks it first).
+                let last = state.settings.lock().unwrap().last_server.clone();
+                if let Some(id) = last {
+                    let _ = crate::server::open_picker(app, &state, Some(&id));
+                }
+            }
+        }
+    }
     for label in [UI, VIDEO] {
         if let Some(w) = app.get_webview_window(label) {
             let _ = w.destroy();
         }
     }
     if was_on {
-        if let Some(main) = app.get_webview_window("main") {
-            // Started in the TV mode, the window was never placed: the middle of the screen.
-            if state.settings.lock().unwrap().window.is_none() {
-                let _ = main.center();
-            }
-            let _ = main.show();
-            let _ = main.set_focus();
-        }
         crate::refresh_tray(app);
     }
 }
@@ -326,13 +357,13 @@ fn capabilities() -> Value {
 // Commands that open windows are async: from a synchronous command (on the main thread) that
 // deadlocks on Windows (WebView2).
 #[tauri::command]
-pub async fn tv_enter<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    enter(&app)
+pub async fn tv_enter(app: AppHandle) -> Result<(), String> {
+    enter(&app).inspect_err(|e| eprintln!("FreeX Desktop: no TV mode: {e}"))
 }
 
 /// Leaves the TV mode (from the app's settings window).
 #[tauri::command]
-pub fn tv_leave<R: Runtime>(app: AppHandle<R>) {
+pub fn tv_leave(app: AppHandle) {
     let app2 = app.clone();
     let _ = app.run_on_main_thread(move || leave(&app2));
 }
@@ -383,11 +414,7 @@ pub fn tv_player(
 /// The other calls of the interface: `info`, `tv.leave`, `app.quit`, `app.settings` (the app's
 /// own settings window), `autostart.get`, `autostart.set` (`{on}`).
 #[tauri::command]
-pub async fn tv_call<R: Runtime>(
-    app: AppHandle<R>,
-    method: String,
-    args: Option<Value>,
-) -> Result<Value, String> {
+pub async fn tv_call(app: AppHandle, method: String, args: Option<Value>) -> Result<Value, String> {
     match method.as_str() {
         "autostart.get" => Ok(Value::Bool(crate::autostart::enabled())),
         "autostart.set" => {

@@ -12,6 +12,7 @@
     "allow-tv-call",
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
-    "allow-settings-open"
+    "allow-settings-open",
+    "allow-tv-leave"
   ]
 }

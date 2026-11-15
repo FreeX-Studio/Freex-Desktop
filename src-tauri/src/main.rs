@@ -101,12 +101,21 @@ fn main() {
             app.manage(AppState::new(config.join("settings.json")));
             let tv_start =
                 wants_tv(&std::env::args().collect::<Vec<_>>()) && tv::ready(app.handle());
-            create_main_window(app.handle(), !tv_start)?;
             if tv_start {
-                if let Err(e) = tv::enter(app.handle()) {
-                    eprintln!("FreeX Desktop: no TV mode: {e}");
-                    show_main(app.handle());
-                }
+                // Started in the TV mode: only its windows, no normal window behind them. Once the
+                // app runs (its windows need the running event loop to get a native window for
+                // mpv); without a TV mode the normal window after all.
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = tv::enter(&handle) {
+                        eprintln!("FreeX Desktop: no TV mode: {e}");
+                        if let Err(e) = create_main_window(&handle, true) {
+                            eprintln!("FreeX Desktop: no window: {e}");
+                        }
+                    }
+                });
+            } else {
+                create_main_window(app.handle(), true)?;
             }
             // Without a tray (e.g. a Linux desktop without status icons) the app works as well.
             if let Err(e) = create_tray(app.handle()) {
@@ -148,6 +157,12 @@ fn main() {
         } if label == settings::LABEL => {
             tv::focus(app);
         }
+        // Between the normal window and the TV mode there is a moment without a window of the
+        // app (the normal one is closed in the TV mode): that is no reason to quit. Quitting on
+        // purpose (app.exit) has an exit code and is not held up.
+        RunEvent::ExitRequested {
+            code: None, api, ..
+        } if app.get_webview_window("main").is_none() => api.prevent_exit(),
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => show_main(app),
         RunEvent::Exit => {
@@ -187,7 +202,7 @@ fn user_agent() -> Option<String> {
     }
 }
 
-fn create_main_window(app: &AppHandle, show: bool) -> tauri::Result<()> {
+pub(crate) fn create_main_window(app: &AppHandle, show: bool) -> tauri::Result<()> {
     let nav_app = app.clone();
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("FreeX")
@@ -297,6 +312,13 @@ pub(crate) fn save_geometry(app: &AppHandle) {
 fn show_main(app: &AppHandle) {
     // In the TV mode, its window is the one to show.
     if tv::focus(app) {
+        return;
+    }
+    // The normal window is closed while the TV mode is on; after it, it comes back here.
+    if app.get_webview_window("main").is_none() {
+        if let Err(e) = create_main_window(app, true) {
+            eprintln!("FreeX Desktop: no window: {e}");
+        }
         return;
     }
     if let Some(window) = app.get_webview_window("main") {

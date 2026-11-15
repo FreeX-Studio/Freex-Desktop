@@ -34,7 +34,7 @@ native program:
 
 - **TV mode** – the PC as a FreeX box on the TV: the interface of the FreeX TV apps (the same as on Samsung, LG,
   Fire TV and FreeXHT, not FreeX Web) in full screen, for a remote control, an air mouse or a keyboard, with mpv as
-  its player. Start it from the tray menu, with **Ctrl+Shift+T** (Cmd+Shift+T on macOS), in the app's settings
+  its player. Start and leave it from the tray menu, with **Ctrl+Shift+T** (Cmd+Shift+T on macOS), in the app's settings
   window or with `freex-desktop --tv`; *Start in TV mode at login* turns the PC into a TV box (also an option of
   the Windows installer).
 
@@ -56,6 +56,9 @@ as they are (mpv plays them).
   above the TV mode.
 - If mpv cannot be started (it ends right away four times in a row, e.g. an old version), the TV mode stops trying
   and shows the error with the first video instead of restarting it forever.
+- The TV mode replaces the normal window instead of running on top of it: switching closes FreeX Web and opens the
+  TV interface, and leaving the TV mode opens FreeX Web again, directly with the last server. **Ctrl+Shift+T**
+  (Cmd+Shift+T) switches both ways.
 - The TV mode signs in separately (it is its own interface); the server comes from the app (the last one opened).
 
 | System | How |
