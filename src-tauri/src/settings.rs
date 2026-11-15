@@ -61,8 +61,9 @@ pub fn open<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Async: opening a window from a synchronous command deadlocks on Windows (WebView2).
 #[tauri::command]
-pub fn settings_open<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+pub async fn settings_open<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     open(&app).map_err(|e| e.to_string())
 }
 

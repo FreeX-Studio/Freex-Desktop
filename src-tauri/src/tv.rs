@@ -323,8 +323,10 @@ fn capabilities() -> Value {
 
 // ---------------------------------------------------------------------------- commands
 
+// Commands that open windows are async: from a synchronous command (on the main thread) that
+// deadlocks on Windows (WebView2).
 #[tauri::command]
-pub fn tv_enter<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+pub async fn tv_enter<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     enter(&app)
 }
 
@@ -381,7 +383,7 @@ pub fn tv_player(
 /// The other calls of the interface: `info`, `tv.leave`, `app.quit`, `app.settings` (the app's
 /// own settings window), `autostart.get`, `autostart.set` (`{on}`).
 #[tauri::command]
-pub fn tv_call<R: Runtime>(
+pub async fn tv_call<R: Runtime>(
     app: AppHandle<R>,
     method: String,
     args: Option<Value>,
