@@ -52,6 +52,7 @@ pub fn open<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .zoom_hotkeys_enabled(true);
     // In the TV mode: owned by the TV window and above it (it is full screen and on macOS
     // floats above everything).
+    let builder = crate::shared_webview(builder);
     let builder = match app.get_webview_window(crate::tv::UI).filter(|_| tv) {
         Some(ui) => builder.parent(&ui)?.always_on_top(true),
         None => builder,

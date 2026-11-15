@@ -220,9 +220,7 @@ pub(crate) fn create_main_window(app: &AppHandle, show: bool) -> tauri::Result<(
         Some(ua) => builder.user_agent(&ua),
         None => builder,
     };
-    // Windows 11 style scroll bars that only show while scrolling.
-    #[cfg(windows)]
-    let builder = builder.scroll_bar_style(tauri::webview::ScrollBarStyle::FluentOverlay);
+    let builder = shared_webview(builder);
     let window = builder
         // Only the picker and known servers are shown in the window; every other link opens
         // in the default browser (trailers, TMDB pages, help links).
@@ -326,6 +324,18 @@ fn show_main(app: &AppHandle) {
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+/// What every window of the app must set the same way. On Windows all windows share one WebView2
+/// browser process, and its options (here the scroll bar style) are fixed by the first window: a
+/// later window that asks for others is refused ("failed to create webview", 0x8007139F).
+pub(crate) fn shared_webview<'a, R: Runtime, M: Manager<R>>(
+    builder: WebviewWindowBuilder<'a, R, M>,
+) -> WebviewWindowBuilder<'a, R, M> {
+    // Windows 11 style scroll bars that only show while scrolling.
+    #[cfg(windows)]
+    let builder = builder.scroll_bar_style(tauri::webview::ScrollBarStyle::FluentOverlay);
+    builder
 }
 
 fn german() -> bool {

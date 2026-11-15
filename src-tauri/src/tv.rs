@@ -176,14 +176,16 @@ pub fn enter(app: &AppHandle) -> Result<(), String> {
     let video = if cfg!(target_os = "macos") {
         None
     } else {
-        Some(
+        let builder =
             WebviewWindowBuilder::new(app, VIDEO, WebviewUrl::App("tv-video.html".into()))
                 .title("FreeX TV")
                 .decorations(false)
                 .visible(false)
                 .skip_taskbar(true)
                 .focused(false)
-                .background_color(tauri::window::Color(0, 0, 0, 0xff))
+                .background_color(tauri::window::Color(0, 0, 0, 0xff));
+        Some(
+            crate::shared_webview(builder)
                 .build()
                 .map_err(|e| e.to_string())?,
         )
@@ -209,6 +211,7 @@ pub fn enter(app: &AppHandle) -> Result<(), String> {
         .initialization_script(crate::NATIVE_JS)
         .initialization_script(&bridge)
         .zoom_hotkeys_enabled(false);
+    let builder = crate::shared_webview(builder);
     let builder = match &video {
         // Owned by the video window: always above it, minimized and restored together.
         Some(video) => match builder.parent(video) {
