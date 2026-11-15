@@ -111,10 +111,14 @@ EOF
             options {
                 timeout(time: 60, unit: 'MINUTES')
             }
+            // The PATH of the pipeline is the Linux agent's (without it, Jenkins does not even
+            // find sh on the Mac); this stage uses the Mac's usual one. rustup's comes in the step.
+            environment {
+                PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+            }
             steps {
                 sh '''
-                    # PATH of the pipeline comes from the Linux agent; the Mac has its own.
-                    export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+                    export PATH="$HOME/.cargo/bin:$PATH"
                     rm -rf dist
                     (cd src-tauri && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked)
                     packaging/macos/build.sh "$BUILD_NUMBER"
