@@ -121,8 +121,12 @@ fn macos_places() -> Vec<PathBuf> {
 /// Native handle of the app window that mpv can draw into (`--wid`): a Win32 window or an X11
 /// window. `None` on Wayland (no embedding of foreign windows) and other platforms.
 fn embed_target<R: Runtime>(app: &AppHandle<R>) -> Option<i64> {
+    window_id(&app.get_webview_window("main")?)
+}
+
+/// Native handle of a window of the app for mpv's `--wid` (Win32 or X11), see [`embed_target`].
+pub fn window_id<R: Runtime>(window: &tauri::WebviewWindow<R>) -> Option<i64> {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-    let window = app.get_webview_window("main")?;
     let handle = window.window_handle().ok()?;
     match handle.as_raw() {
         RawWindowHandle::Win32(h) => Some(h.hwnd.get() as i64),
@@ -379,13 +383,13 @@ fn ipc_path(id: u64) -> String {
 
 /// Connects to mpv's IPC; mpv creates it shortly after starting.
 #[cfg(windows)]
-async fn connect(path: &str) -> std::io::Result<impl AsyncRead + AsyncWrite> {
+pub async fn connect(path: &str) -> std::io::Result<impl AsyncRead + AsyncWrite> {
     use tokio::net::windows::named_pipe::ClientOptions;
     ClientOptions::new().open(path)
 }
 
 #[cfg(not(windows))]
-async fn connect(path: &str) -> std::io::Result<impl AsyncRead + AsyncWrite> {
+pub async fn connect(path: &str) -> std::io::Result<impl AsyncRead + AsyncWrite> {
     tokio::net::UnixStream::connect(path).await
 }
 

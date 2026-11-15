@@ -81,6 +81,8 @@ LangString SecApp ${LANG_ENGLISH} "FreeX Desktop with mpv"
 LangString SecApp ${LANG_GERMAN} "FreeX Desktop mit mpv"
 LangString SecDesktop ${LANG_ENGLISH} "Desktop shortcut"
 LangString SecDesktop ${LANG_GERMAN} "Verknüpfung auf dem Desktop"
+LangString SecTv ${LANG_ENGLISH} "Start in TV mode at login"
+LangString SecTv ${LANG_GERMAN} "Bei der Anmeldung im TV-Modus starten"
 LangString CloseApp ${LANG_ENGLISH} "Closing the running app..."
 LangString CloseApp ${LANG_GERMAN} "Laufende App beenden..."
 LangString WebView ${LANG_ENGLISH} "Installing the Microsoft Edge WebView2 Runtime..."
@@ -173,6 +175,12 @@ Section "$(SecDesktop)" SecDesktop
     CreateShortcut "$DESKTOP\FreeX.lnk" "$INSTDIR\${EXE}" "" "$INSTDIR\${EXE}" 0
 SectionEnd
 
+; Off by default: FreeX starts in the TV mode when the user logs in (a box on the TV). The same
+; value the app's setting "Start in TV mode at login" writes (src-tauri/src/autostart.rs).
+Section /o "$(SecTv)" SecTv
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "FreeX TV" '"$INSTDIR\${EXE}" --tv'
+SectionEnd
+
 ; Starts the app without administrator rights (through Explorer), as the signed-in user.
 Function StartApp
     Exec '"$WINDIR\explorer.exe" "$INSTDIR\${EXE}"'
@@ -184,6 +192,7 @@ Section "Uninstall"
     Sleep 500
     Delete "$SMPROGRAMS\FreeX.lnk"
     Delete "$DESKTOP\FreeX.lnk"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "FreeX TV"
     RMDir /r "$INSTDIR\mpv"
     Delete "$INSTDIR\${EXE}"
     Delete "$INSTDIR\WebView2Loader.dll"

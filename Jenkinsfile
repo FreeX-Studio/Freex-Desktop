@@ -34,6 +34,8 @@ pipeline {
             steps {
                 // The workspace is kept between builds; packages of earlier versions must go.
                 sh 'rm -rf dist'
+                // The TV mode's interface (ui/tv) from FreeX-TV-Apps, branch TV_APPS_REF (main).
+                sh 'packaging/tv-ui.sh'
                 dir('src-tauri') {
                     sh 'cargo fmt --check'
                     sh 'cargo clippy --locked --all-targets -- -D warnings'
@@ -122,6 +124,7 @@ EOF
                     # rustup may have been installed with the minimal profile; adds what is missing.
                     rustup component add clippy rustfmt
                     rm -rf dist
+                    packaging/tv-ui.sh
                     (cd src-tauri && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked)
                     packaging/macos/build.sh "$BUILD_NUMBER"
                 '''

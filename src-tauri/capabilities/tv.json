@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "tv",
+  "description": "The TV mode's window (ui/tv, the interface of the FreeX TV apps): its player, its calls (leave, quit, autostart) and full screen.",
+  "local": true,
+  "windows": [
+    "tv"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-tv-player",
+    "allow-tv-call",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen"
+  ]
+}

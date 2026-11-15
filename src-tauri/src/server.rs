@@ -42,6 +42,7 @@ pub struct AppState {
     /// Id of the server shown in the window; none while the picker is shown.
     open_server: Mutex<Option<String>>,
     pub mpv: mpv::Mpv,
+    pub tv: crate::tv::Tv,
 }
 
 impl AppState {
@@ -53,6 +54,7 @@ impl AppState {
             local_url: Mutex::new(None),
             open_server: Mutex::new(None),
             mpv: mpv::Mpv::default(),
+            tv: crate::tv::Tv::default(),
         }
     }
 
@@ -200,6 +202,7 @@ fn grant<R: Runtime>(app: &AppHandle<R>, state: &AppState, origin: &str) -> Resu
         .permission("allow-mpv-play")
         .permission("allow-mpv-stop")
         .permission("allow-mpv-key")
+        .permission("allow-tv-enter")
         .permission("core:event:allow-listen")
         .permission("core:event:allow-unlisten")
         .permission("core:window:allow-set-fullscreen")
@@ -326,6 +329,8 @@ pub struct DesktopInfo {
     mpv_embed: bool,
     /// The system allows mpv inside the app window (not on Wayland).
     mpv_can_embed: bool,
+    /// The TV mode is offered on this system (see tv.rs).
+    tv_available: bool,
     /// The server the asking page belongs to (none for the picker).
     server: Option<Server>,
 }
@@ -352,6 +357,7 @@ pub fn desktop_info<R: Runtime>(
         mpv_fullscreen: settings.mpv_fullscreen,
         mpv_embed: settings.mpv_embed,
         mpv_can_embed,
+        tv_available: crate::tv::available(),
         server,
     }
 }

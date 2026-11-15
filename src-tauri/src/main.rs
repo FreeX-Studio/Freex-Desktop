@@ -17,13 +17,18 @@
 //! that it behaves like a native app: remembered servers (also in the tray menu), playback of
 //! any file in mpv inside the app window without conversion, media keys, real full screen (F11),
 //! a dark title bar, no browser menus or shortcuts, and a single running instance.
+//!
+//! On Windows there is also a TV mode (tv.rs): the interface of the FreeX TV apps, full screen,
+//! for a remote control, with mpv as its player. `--tv` starts the app in it.
 
 // No console window in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod autostart;
 mod mpv;
 mod server;
 mod store;
+mod tv;
 
 use server::AppState;
 use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
@@ -38,16 +43,34 @@ use tauri::{
 const TRAY: &str = "freex";
 
 /// Makes the web view behave like an app window (see the file); runs in every page.
-const NATIVE_JS: &str = include_str!("native.js");
+pub const NATIVE_JS: &str = include_str!("native.js");
+
+/// The app was started (or started again) to show the TV mode.
+fn wants_tv(args: &[String]) -> bool {
+    args.iter().any(|a| a == "--tv")
+}
 
 fn main() {
     #[cfg(target_os = "linux")]
     linux_environment();
+    // Linux on Wayland: the TV mode needs the X11 backend (XWayland), see tv.rs.
+    #[cfg(target_os = "linux")]
+    if wants_tv(&std::env::args().collect::<Vec<_>>()) && tv::needs_x11() {
+        // Still single-threaded: nothing else reads the environment yet.
+        std::env::set_var("GDK_BACKEND", "x11");
+    }
 
     let app = tauri::Builder::default()
         // A second start just brings the open window to the front.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_main(app)
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if wants_tv(&args) && tv::available() {
+                if let Err(e) = tv::enter(app) {
+                    eprintln!("FreeX Desktop: no TV mode: {e}");
+                    show_main(app);
+                }
+            } else {
+                show_main(app)
+            }
         }))
         .invoke_handler(tauri::generate_handler![
             server::servers_list,
@@ -61,11 +84,23 @@ fn main() {
             mpv::mpv_play,
             mpv::mpv_stop,
             mpv::mpv_key,
+            tv::tv_enter,
+            tv::tv_player,
+            tv::tv_call,
+            autostart::autostart_get,
+            autostart::autostart_set,
         ])
         .setup(|app| {
             let config = app.path().app_config_dir()?;
             app.manage(AppState::new(config.join("settings.json")));
-            create_main_window(app.handle())?;
+            let tv_start = wants_tv(&std::env::args().collect::<Vec<_>>()) && tv::available();
+            create_main_window(app.handle(), !tv_start)?;
+            if tv_start {
+                if let Err(e) = tv::enter(app.handle()) {
+                    eprintln!("FreeX Desktop: no TV mode: {e}");
+                    show_main(app.handle());
+                }
+            }
             // Without a tray (e.g. a Linux desktop without status icons) the app works as well.
             if let Err(e) = create_tray(app.handle()) {
                 eprintln!("FreeX Desktop: no tray icon: {e}");
@@ -92,11 +127,18 @@ fn main() {
                 }
             }
         }
+        // The TV window closed (Alt+F4): back to the normal window.
+        RunEvent::WindowEvent {
+            label,
+            event: WindowEvent::Destroyed,
+            ..
+        } if label == tv::UI => tv::leave(app),
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => show_main(app),
         RunEvent::Exit => {
             if let Some(state) = app.try_state::<AppState>() {
                 state.mpv.stop();
+                state.tv.stop();
             }
         }
         _ => {}
@@ -130,7 +172,7 @@ fn user_agent() -> Option<String> {
     }
 }
 
-fn create_main_window(app: &AppHandle) -> tauri::Result<()> {
+fn create_main_window(app: &AppHandle, show: bool) -> tauri::Result<()> {
     let nav_app = app.clone();
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("FreeX")
@@ -198,7 +240,9 @@ fn create_main_window(app: &AppHandle) -> tauri::Result<()> {
     } else {
         let _ = window.center();
     }
-    window.show()?;
+    if show {
+        window.show()?;
+    }
     Ok(())
 }
 
@@ -236,6 +280,10 @@ fn save_geometry(app: &AppHandle) {
 }
 
 fn show_main(app: &AppHandle) {
+    // In the TV mode, its window is the one to show.
+    if tv::focus(app) {
+        return;
+    }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
@@ -286,6 +334,20 @@ fn tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         None::<&str>,
     )?));
+    if tv::available() {
+        let on = app.try_state::<AppState>().is_some_and(|s| s.tv.active());
+        items.push(Box::new(MenuItem::with_id(
+            app,
+            if on { "tv-leave" } else { "tv-enter" },
+            if on {
+                tr("TV-Modus beenden", "Leave TV mode")
+            } else {
+                tr("TV-Modus", "TV mode")
+            },
+            true,
+            None::<&str>,
+        )?));
+    }
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(MenuItem::with_id(
         app,
@@ -317,7 +379,14 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
             let id = event.id().as_ref();
             match id {
                 "show" => show_main(app),
+                "tv-enter" => {
+                    if let Err(e) = tv::enter(app) {
+                        eprintln!("FreeX Desktop: no TV mode: {e}");
+                    }
+                }
+                "tv-leave" => tv::leave(app),
                 "servers" => {
+                    tv::leave(app);
                     show_main(app);
                     if let Some(state) = app.try_state::<AppState>() {
                         state.mpv.stop();

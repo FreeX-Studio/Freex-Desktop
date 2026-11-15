@@ -53,6 +53,11 @@
             "mpv spielt jede Datei direkt ab, ohne Umwandlung auf dem Server. Intro überspringen und Watch Together gibt es nur im FreeX-Player.",
         "mpv was not found. Reinstall FreeX Desktop or install mpv and add it to the PATH.":
             "mpv wurde nicht gefunden. Installiere FreeX Desktop neu oder installiere mpv und nimm es in den PATH auf.",
+        "TV mode": "TV-Modus",
+        "Start TV mode": "TV-Modus starten",
+        "Start in TV mode at login": "Bei der Anmeldung im TV-Modus starten",
+        "The interface of the FreeX TV apps in full screen, for a remote control or a keyboard, with mpv as the player. Also with Ctrl+Shift+T and from the tray menu.":
+            "Die Oberfläche der FreeX-TV-Apps im Vollbild, für Fernbedienung oder Tastatur, mit mpv als Player. Auch mit Strg+Umschalt+T und über das Tray-Menü.",
     };
     const german = (navigator.language || "").toLowerCase().startsWith("de");
     document.documentElement.lang = german ? "de" : "en";
@@ -226,12 +231,33 @@
     });
     $("auto-connect").addEventListener("change", (e) => invoke("set_auto_connect", {enabled: e.target.checked}));
 
+    /** TV mode: start it now, and whether the app starts in it at login. */
+    async function renderTv() {
+        $("tv-row").hidden = $("tv-auto-row").hidden = !info.tvAvailable;
+        if (!info.tvAvailable) return;
+        try {
+            $("tv-autostart").checked = await invoke("autostart_get");
+        } catch (e) {
+            $("tv-auto-row").hidden = true;
+        }
+    }
+    $("tv-enter").addEventListener("click", () => invoke("tv_enter").catch((e) => showError(String(e))));
+    $("tv-autostart").addEventListener("change", async (e) => {
+        try {
+            e.target.checked = await invoke("autostart_set", {on: e.target.checked});
+        } catch (err) {
+            e.target.checked = !e.target.checked;
+            showError(String(err));
+        }
+    });
+
     // ------------------------------------------------------------------ start
 
     (async () => {
         info = await invoke("desktop_info");
         $("version").textContent = `${info.app} ${info.version}`;
         renderPlayer();
+        renderTv();
         const list = await renderList();
         const params = new URLSearchParams(location.search);
         const picking = params.has("pick");

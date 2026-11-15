@@ -26,6 +26,11 @@ fn main() {
             "mpv_play",
             "mpv_stop",
             "mpv_key",
+            "tv_enter",
+            "tv_player",
+            "tv_call",
+            "autostart_get",
+            "autostart_set",
         ]),
     ))
     .expect("failed to run tauri-build");

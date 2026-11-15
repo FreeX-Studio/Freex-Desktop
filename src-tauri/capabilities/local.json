@@ -3,7 +3,9 @@
   "identifier": "local",
   "description": "The bundled server picker. Pages of a FreeX server get their own, smaller capability at runtime (see server.rs).",
   "local": true,
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "allow-servers-list",
@@ -14,6 +16,9 @@
     "allow-desktop-info",
     "allow-set-player",
     "core:window:allow-set-fullscreen",
-    "core:window:allow-is-fullscreen"
+    "core:window:allow-is-fullscreen",
+    "allow-tv-enter",
+    "allow-autostart-get",
+    "allow-autostart-set"
   ]
 }

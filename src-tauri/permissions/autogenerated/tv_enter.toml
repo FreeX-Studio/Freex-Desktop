@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tv-enter"
+description = "Enables the tv_enter command without any pre-configured scope."
+commands.allow = ["tv_enter"]
+
+[[permission]]
+identifier = "deny-tv-enter"
+description = "Denies the tv_enter command without any pre-configured scope."
+commands.deny = ["tv_enter"]

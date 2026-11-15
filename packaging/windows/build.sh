@@ -69,6 +69,8 @@ if ! ls "$libdir"/libstd-*.rlib >/dev/null 2>&1; then
         exit 1
     fi
 fi
+# The TV mode's interface (ui/tv, from FreeX-TV-Apps) is bundled into the app.
+[ -f "$ROOT/ui/tv/index.html" ] || "$ROOT/packaging/tv-ui.sh"
 (cd "$ROOT/src-tauri" && cargo "${cargo_args[@]}")
 EXE="$ROOT/src-tauri/target/$TARGET/release/freex-desktop.exe"
 # With the GNU toolchain the WebView2 loader is a DLL next to the exe (from the WebView2 SDK).

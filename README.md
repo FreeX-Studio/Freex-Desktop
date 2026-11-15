@@ -32,8 +32,34 @@ native program:
   browser context menu and no browser shortcuts (print, find, view source), a tray icon, one running instance and
   remembered window size.
 
+- **TV mode** – the PC as a FreeX box on the TV: the interface of the FreeX TV apps (the same as on Samsung, LG,
+  Fire TV and FreeXHT, not FreeX Web) in full screen, for a remote control, an air mouse or a keyboard, with mpv as
+  its player. Start it from the tray menu, with **Ctrl+Shift+T** (Cmd+Shift+T on macOS), with the button in the app
+  settings or with `freex-desktop --tv`; *Start in TV mode at login* turns the PC into a TV box (also an option of
+  the Windows installer).
+
 The family: **FreeX Media Server** (core), **FreeX Web** (built into the server), **FreeX Desktop** (this
 repository), and the planned **FreeX iOS**, **FreeX Android** and **FreeX TV**.
+
+## TV mode
+
+The TV mode shows the interface of [FreeX-TV-Apps](https://github.com/FreeX-Studio/FreeX-TV-Apps), bundled into the
+app at build time (`packaging/tv-ui.sh` puts its `web/` into `ui/tv/`). It works like the FreeXHT system image:
+mpv plays in a black full-screen window, the interface lies on top of it in a transparent full-screen window and
+drives mpv through the same bridge as on the TV apps (`window.FreeXNative`, `src-tauri/src/tv_bridge.js`). The seek
+bar, seek previews, *Skip intro*, *Next episode* and text subtitles come from the interface; the server sends files
+as they are (mpv plays them).
+
+- Text fields open an on-screen keyboard (for remotes); typing on a keyboard hides it.
+- **Back** on the home screen asks: close FreeX, leave the TV mode, or cancel. **Settings → FreeX Desktop**: leave
+  the TV mode, quit, and *Start in TV mode at login*.
+- The TV mode signs in separately (it is its own interface); the server comes from the app (the last one opened).
+
+| System | How |
+|---|---|
+| Windows | mpv draws into the app's video window (`--wid`); the TV window is owned by it and stays on top. Autostart: `HKCU\…\Run`, value "FreeX TV". |
+| Linux | the same on X11 (needs a compositing window manager for the transparency, which every current desktop has). On Wayland the app runs the TV mode through XWayland (`GDK_BACKEND=x11`, started again for it). Autostart: `~/.config/autostart/freex-desktop-tv.desktop`. |
+| macOS | mpv opens its own borderless full-screen window (without Dock icon, without taking the keyboard), the TV window floats above it. Autostart: the launch agent `~/Library/LaunchAgents/de.mirranet.freex.desktop.tv.plist`. |
 
 ## Install
 

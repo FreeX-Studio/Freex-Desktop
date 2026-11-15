@@ -54,6 +54,8 @@ done
 # Both architectures, then one universal binary.
 binaries=()
 for target in "${TARGETS[@]}"; do
+    # The TV mode's interface (ui/tv, from FreeX-TV-Apps) is bundled into the app.
+    [ -f "$ROOT/ui/tv/index.html" ] || "$ROOT/packaging/tv-ui.sh"
     (cd "$ROOT/src-tauri" && cargo build --release --locked --features custom-protocol --target "$target")
     binaries+=("$ROOT/src-tauri/target/$target/release/freex-desktop")
 done

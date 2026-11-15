@@ -9,8 +9,9 @@
     "withGlobalTauri": true,
     "windows": [],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; connect-src ipc: http://ipc.localhost"
-    }
+      "csp": "default-src 'self'; img-src 'self' data: blob: http: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' blob: http: https:; connect-src ipc: http://ipc.localhost http: https:"
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": false,

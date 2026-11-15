@@ -74,6 +74,15 @@
             <input type="checkbox" id="mpv-fullscreen">
             <span data-t="Start mpv in full screen"></span>
         </label>
+        <div class="field tv-only" id="tv-row" hidden>
+            <label data-t="TV mode"></label>
+            <div class="hint" data-t="The interface of the FreeX TV apps in full screen, for a remote control or a keyboard, with mpv as the player. Also with Ctrl+Shift+T and from the tray menu."></div>
+            <button class="btn" id="tv-enter" type="button" data-t="Start TV mode"></button>
+        </div>
+        <label class="check tv-only" id="tv-auto-row" hidden>
+            <input type="checkbox" id="tv-autostart">
+            <span data-t="Start in TV mode at login"></span>
+        </label>
     </section>
 
     <footer class="muted" id="version"></footer>
