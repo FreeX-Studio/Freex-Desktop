@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tv-leave"
+description = "Enables the tv_leave command without any pre-configured scope."
+commands.allow = ["tv_leave"]
+
+[[permission]]
+identifier = "deny-tv-leave"
+description = "Denies the tv_leave command without any pre-configured scope."
+commands.deny = ["tv_leave"]

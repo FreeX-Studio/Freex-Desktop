@@ -34,8 +34,8 @@ native program:
 
 - **TV mode** – the PC as a FreeX box on the TV: the interface of the FreeX TV apps (the same as on Samsung, LG,
   Fire TV and FreeXHT, not FreeX Web) in full screen, for a remote control, an air mouse or a keyboard, with mpv as
-  its player. Start it from the tray menu, with **Ctrl+Shift+T** (Cmd+Shift+T on macOS), with the button in the app
-  settings or with `freex-desktop --tv`; *Start in TV mode at login* turns the PC into a TV box (also an option of
+  its player. Start it from the tray menu, with **Ctrl+Shift+T** (Cmd+Shift+T on macOS), in the app's settings
+  window or with `freex-desktop --tv`; *Start in TV mode at login* turns the PC into a TV box (also an option of
   the Windows installer).
 
 The family: **FreeX Media Server** (core), **FreeX Web** (built into the server), **FreeX Desktop** (this
@@ -52,7 +52,10 @@ as they are (mpv plays them).
 
 - Text fields open an on-screen keyboard (for remotes); typing on a keyboard hides it.
 - **Back** on the home screen asks: close FreeX, leave the TV mode, or cancel. **Settings → FreeX Desktop**: leave
-  the TV mode, quit, and *Start in TV mode at login*.
+  the TV mode, quit, and *Start in TV mode at login*; with a keyboard, **Ctrl+,** opens the app's settings window
+  above the TV mode.
+- If mpv cannot be started (it ends right away four times in a row, e.g. an old version), the TV mode stops trying
+  and shows the error with the first video instead of restarting it forever.
 - The TV mode signs in separately (it is its own interface); the server comes from the app (the last one opened).
 
 | System | How |
@@ -118,9 +121,14 @@ Updates install over the old version and keep all settings.
 
 ## Using it
 
+- **App settings:** the tray menu → *Settings …* or **Ctrl+,** (Cmd+, on macOS) opens FreeX's own settings window,
+  in the normal window as well as in the TV mode: switch between the normal window and the TV mode, *Start in TV
+  mode at login*, the player, the server and quitting. These settings belong to this PC and are stored in the app,
+  not on the server; the window works with a remote control too (arrows, OK, Back).
 - **Switch server:** the tray menu (one click per server), account menu → *Switch server*, *Settings → FreeX
   Desktop*, or the sign-in page. The tray menu also works when a server is unreachable.
-- **Player:** *Settings → FreeX Desktop* or the app settings below the server list. *FreeX player* is the player
+- **Player:** the app's settings window, *Settings → FreeX Desktop* in FreeX Web, or the app settings below the
+  server list. *FreeX player* is the player
   of FreeX Web with skip intro, up next and Watch Together. *mpv* plays every file directly; when an episode has
   played to the end, the next one starts after a short countdown. Watch Together always uses the FreeX player.
 - **mpv in the window:** mpv's keys work as usual (Space pause, ← → seek, F full screen, Q stop). Esc leaves full
@@ -178,9 +186,12 @@ the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `M
 | `src-tauri/src/server.rs` | Finding a server, opening it, the commands its pages may call |
 | `src-tauri/src/mpv.rs` | Playback in mpv over its JSON IPC, inside the app window |
 | `src-tauri/src/native.js` | Runs in every page: app instead of browser behaviour, keys for mpv |
+| `src-tauri/src/settings.rs` | The app's own settings window (TV mode, start at login, player, server) |
+| `src-tauri/src/tv.rs`, `tv_bridge.js` | TV mode: its windows, mpv for the TV interface, the `FreeXNative` bridge |
+| `src-tauri/src/autostart.rs` | Starting in the TV mode at login (Run key, XDG autostart, launch agent) |
 | `src-tauri/src/store.rs` | `settings.json` |
 | `src-tauri/icons/` | App icons; `app-icon.svg` is the source of the PNG icons, `app-icon-macos.svg` of `icon.icns` |
-| `ui/` | The server picker (plain HTML, CSS and JavaScript) |
+| `ui/` | The server picker and the settings window (plain HTML, CSS and JavaScript); `ui/tv/` comes from FreeX-TV-Apps at build time |
 | `packaging/windows/` | Installer (NSIS) and build script |
 | `packaging/macos/` | `Info.plist` and build script of the Mac app (`.app`, `.dmg`) |
 | `packaging/deb/` | Debian package: menu entry, AppStream data, build script |

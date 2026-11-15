@@ -202,9 +202,10 @@ fn grant<R: Runtime>(app: &AppHandle<R>, state: &AppState, origin: &str) -> Resu
         .permission("allow-mpv-play")
         .permission("allow-mpv-stop")
         .permission("allow-mpv-key")
+        // Only the keyboard shortcuts of native.js (Ctrl+Shift+T, Ctrl+,): what is set for this
+        // PC (TV mode at login, …) stays in the app's own settings window, not on a server.
         .permission("allow-tv-enter")
-        .permission("allow-autostart-get")
-        .permission("allow-autostart-set")
+        .permission("allow-settings-open")
         .permission("core:event:allow-listen")
         .permission("core:event:allow-unlisten")
         .permission("core:window:allow-set-fullscreen")
@@ -275,6 +276,13 @@ pub fn show_servers<R: Runtime>(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state.mpv.stop();
+    // From the TV mode (the settings window): back to the normal window first.
+    crate::tv::leave(&app);
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
     open_picker(&app, &state, None)
 }
 
@@ -331,8 +339,12 @@ pub struct DesktopInfo {
     mpv_embed: bool,
     /// The system allows mpv inside the app window (not on Wayland).
     mpv_can_embed: bool,
-    /// The TV mode is offered on this system (see tv.rs).
+    /// The TV mode is offered on this system and in this build (see tv.rs).
     tv_available: bool,
+    /// The TV mode is on.
+    tv_active: bool,
+    /// The server open in the app (for the settings window), if any.
+    open_server: Option<Server>,
     /// The server the asking page belongs to (none for the picker).
     server: Option<Server>,
 }
@@ -359,7 +371,12 @@ pub fn desktop_info<R: Runtime>(
         mpv_fullscreen: settings.mpv_fullscreen,
         mpv_embed: settings.mpv_embed,
         mpv_can_embed,
-        tv_available: crate::tv::available(),
+        tv_available: crate::tv::ready(&app),
+        tv_active: state.tv.active(),
+        open_server: state
+            .current_server()
+            .or_else(|| settings.last_server.clone())
+            .and_then(|id| settings.servers.iter().find(|s| s.id == id).cloned()),
         server,
     }
 }

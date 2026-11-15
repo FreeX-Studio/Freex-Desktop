@@ -57,9 +57,15 @@ pub const EVENT: &str = "freex-tv";
 /// The bridge for the TV interface; `__FREEX_TV_INFO__` is replaced by [`bridge_info`].
 const BRIDGE_JS: &str = include_str!("tv_bridge.js");
 
-/// True where the TV mode is offered: Windows, Linux and macOS.
+/// True on the systems with a TV mode: Windows, Linux and macOS.
 pub fn available() -> bool {
     cfg!(any(windows, target_os = "linux", target_os = "macos"))
+}
+
+/// True if the TV mode can be offered here: a system with a TV mode and a build that bundles
+/// the TV interface (`ui/tv`, see packaging/tv-ui.sh).
+pub fn ready<R: Runtime>(app: &AppHandle<R>) -> bool {
+    available() && app.asset_resolver().get("tv/index.html".into()).is_some()
 }
 
 /// Linux: true if this process draws through Wayland, where the TV mode cannot stack mpv under
@@ -128,14 +134,14 @@ enum Command {
 /// hidden. If it is on already, its window comes to the front.
 pub fn enter<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     if !available() {
-        return Err("the TV mode is only available on Windows".into());
+        return Err("the TV mode is not available on this system".into());
     }
     let state = app.state::<AppState>();
     if focus(app) {
         return Ok(());
     }
     let mpv = crate::mpv::find().ok_or("mpv not found")?;
-    if app.asset_resolver().get("tv/index.html".into()).is_none() {
+    if !ready(app) {
         return Err("this build has no TV interface (ui/tv)".into());
     }
     #[cfg(target_os = "linux")]
@@ -154,7 +160,13 @@ pub fn enter<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             let _ = w.set_position(*m.position());
             let _ = w.set_size(*m.size());
         }
-        let _ = w.set_fullscreen(true);
+        // macOS: the native full screen would move the window to a Space of its own, away
+        // from mpv's window; the simple full screen keeps it on the desktop, above mpv.
+        if cfg!(target_os = "macos") {
+            let _ = w.set_simple_fullscreen(true);
+        } else {
+            let _ = w.set_fullscreen(true);
+        }
     };
 
     // macOS: mpv in its own window (see the top of the file); elsewhere the video window.
@@ -188,7 +200,7 @@ pub fn enter<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let builder = WebviewWindowBuilder::new(app, UI, WebviewUrl::App("tv/index.html".into()))
         .title("FreeX")
         .decorations(false)
-        .fullscreen(true)
+        .fullscreen(!cfg!(target_os = "macos"))
         .shadow(false)
         .transparent(true)
         .background_color(tauri::window::Color(0, 0, 0, 0))
@@ -267,14 +279,37 @@ fn bridge_info<R: Runtime>(app: &AppHandle<R>) -> Value {
     })
 }
 
+/// The name of the computer, as the server lists the device. Desktop apps on Linux and macOS
+/// usually do not get HOSTNAME, so the name is read where the system keeps it.
 fn computer_name() -> String {
-    std::env::var("COMPUTERNAME")
+    let from_env = std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| "PC".into())
+        .ok();
+    let from_system = || -> Option<String> {
+        if cfg!(target_os = "macos") {
+            // The name from System Settings → General → About ("Niklas' Mac mini").
+            let out = std::process::Command::new("scutil")
+                .args(["--get", "ComputerName"])
+                .output()
+                .ok()?;
+            out.status
+                .success()
+                .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+        } else {
+            std::fs::read_to_string("/etc/hostname")
+                .or_else(|_| std::fs::read_to_string("/proc/sys/kernel/hostname"))
+                .ok()
+        }
+    };
+    from_env
+        .or_else(from_system)
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| "PC".into())
 }
 
-/// mpv decodes practically everything (with the GPU through D3D11 where it can), so the server
-/// sends files as they are.
+/// mpv decodes practically everything (with the GPU where it can), so the server sends files as
+/// they are.
 fn capabilities() -> Value {
     json!({
         "containers": ["mp4", "mkv", "webm", "mpegts", "ts", "avi", "mov", "flv", "ogg"],
@@ -291,6 +326,13 @@ fn capabilities() -> Value {
 #[tauri::command]
 pub fn tv_enter<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     enter(&app)
+}
+
+/// Leaves the TV mode (from the app's settings window).
+#[tauri::command]
+pub fn tv_leave<R: Runtime>(app: AppHandle<R>) {
+    let app2 = app.clone();
+    let _ = app.run_on_main_thread(move || leave(&app2));
 }
 
 #[derive(Deserialize, Default)]
@@ -336,8 +378,8 @@ pub fn tv_player(
     Ok(())
 }
 
-/// The other calls of the interface: `info`, `tv.leave`, `app.quit`, `autostart.get`,
-/// `autostart.set` (`{on}`).
+/// The other calls of the interface: `info`, `tv.leave`, `app.quit`, `app.settings` (the app's
+/// own settings window), `autostart.get`, `autostart.set` (`{on}`).
 #[tauri::command]
 pub fn tv_call<R: Runtime>(
     app: AppHandle<R>,
@@ -370,11 +412,14 @@ pub fn tv_call<R: Runtime>(
             Ok(Value::Bool(true))
         }
         "app.quit" => {
+            // Straight out, without showing the normal window first; mpv ends with the app.
+            app.state::<AppState>().tv.stop();
             let app2 = app.clone();
-            let _ = app.run_on_main_thread(move || {
-                leave(&app2);
-                app2.exit(0);
-            });
+            let _ = app.run_on_main_thread(move || app2.exit(0));
+            Ok(Value::Bool(true))
+        }
+        "app.settings" => {
+            crate::settings::open(&app).map_err(|e| e.to_string())?;
             Ok(Value::Bool(true))
         }
         _ => Err(format!("{method} is not available in FreeX Desktop")),
@@ -387,8 +432,9 @@ static NEXT_PIPE: AtomicU64 = AtomicU64::new(1);
 
 /// mpv's command line for the TV mode: idle and black in the video window (or in its own
 /// borderless full-screen window without `wid`), everything on screen besides the picture comes
-/// from the interface.
-fn mpv_args(ipc: &str, wid: Option<i64>) -> Vec<String> {
+/// from the interface. `compat` leaves out the options only newer mpv versions know (older ones
+/// stop at unknown options), see [`supervise`].
+fn mpv_args(ipc: &str, wid: Option<i64>, compat: bool) -> Vec<String> {
     let mut args: Vec<String> = match wid {
         Some(wid) => vec![format!("--wid={wid}")],
         None => vec![
@@ -396,11 +442,13 @@ fn mpv_args(ipc: &str, wid: Option<i64>) -> Vec<String> {
             "--native-fs=no".into(),
             "--border=no".into(),
             "--keepaspect-window=no".into(),
-            // The TV window keeps the keyboard; mpv stays out of the Dock and Cmd+Tab.
-            "--focus-on=never".into(),
-            "--macos-app-activation-policy=accessory".into(),
         ],
     };
+    if wid.is_none() && !compat {
+        // The TV window keeps the keyboard; mpv stays out of the Dock and Cmd+Tab (mpv 0.38+).
+        args.push("--focus-on=never".into());
+        args.push("--macos-app-activation-policy=accessory".into());
+    }
     args.extend([
         format!("--input-ipc-server={ipc}"),
         "--idle=yes".into(),
@@ -431,7 +479,7 @@ fn mpv_args(ipc: &str, wid: Option<i64>) -> Vec<String> {
     ]);
     // The Windows media overlay (only the mpv bundled for Windows is new enough to know it;
     // older versions stop at unknown options).
-    if cfg!(windows) {
+    if cfg!(windows) && !compat {
         args.push("--media-controls=no".into());
     }
     args
@@ -622,11 +670,17 @@ async fn supervise<R: Runtime>(
     mut commands: mpsc::UnboundedReceiver<Command>,
 ) {
     let mut playback = Playback::default();
+    // mpv that ends right after its start will not get better by starting it again (an option
+    // it does not know, no video output): after two such starts it runs without the newer
+    // options, after four the TV mode gives up and says so instead of trying forever.
+    let mut quick_failures = 0;
     loop {
-        match run(&app, &mpv, wid, &mut commands, &mut playback).await {
+        let compat = quick_failures >= 2;
+        let started = Instant::now();
+        match run(&app, &mpv, wid, compat, &mut commands, &mut playback).await {
             Ended::Quit => return,
             Ended::Died(reason) => {
-                eprintln!("FreeX Desktop: mpv of the TV mode ended ({reason}), starting it again");
+                eprintln!("FreeX Desktop: mpv of the TV mode ended ({reason})");
                 if playback.open {
                     emit(
                         &app,
@@ -634,8 +688,35 @@ async fn supervise<R: Runtime>(
                     );
                 }
                 playback = Playback::default();
+                if started.elapsed() < Duration::from_secs(10) {
+                    quick_failures += 1;
+                } else {
+                    quick_failures = 0;
+                }
+                if quick_failures >= 4 {
+                    let message = format!("mpv cannot be started: {reason}");
+                    eprintln!("FreeX Desktop: {message}; the TV mode plays nothing");
+                    refuse_playback(&app, &mut commands, &message).await;
+                    return;
+                }
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
+        }
+    }
+}
+
+/// Without a working mpv: answers every video with an error until the TV mode ends.
+async fn refuse_playback<R: Runtime>(
+    app: &AppHandle<R>,
+    commands: &mut mpsc::UnboundedReceiver<Command>,
+    message: &str,
+) {
+    emit(app, json!({"type": "error", "message": message}));
+    while let Some(c) = commands.recv().await {
+        match c {
+            Command::Quit => break,
+            Command::Open { .. } => emit(app, json!({"type": "error", "message": message})),
+            _ => {}
         }
     }
 }
@@ -649,12 +730,13 @@ async fn run<R: Runtime>(
     app: &AppHandle<R>,
     mpv: &PathBuf,
     wid: Option<i64>,
+    compat: bool,
     commands: &mut mpsc::UnboundedReceiver<Command>,
     playback: &mut Playback,
 ) -> Ended {
     let ipc = pipe_path();
     let mut cmd = tokio::process::Command::new(mpv);
-    cmd.args(mpv_args(&ipc, wid));
+    cmd.args(mpv_args(&ipc, wid, compat));
     cmd.kill_on_drop(true);
     #[cfg(windows)]
     {
@@ -665,18 +747,9 @@ async fn run<R: Runtime>(
         Ok(child) => child,
         Err(e) => {
             // Without mpv there is nothing to restart: wait for the TV mode to end.
-            eprintln!("FreeX Desktop: mpv could not be started: {e}");
-            while let Some(c) = commands.recv().await {
-                if matches!(c, Command::Quit) {
-                    break;
-                }
-                if matches!(c, Command::Open { .. }) {
-                    emit(
-                        app,
-                        json!({"type": "error", "message": format!("mpv could not be started: {e}")}),
-                    );
-                }
-            }
+            let message = format!("mpv could not be started: {e}");
+            eprintln!("FreeX Desktop: {message}");
+            refuse_playback(app, commands, &message).await;
             return Ended::Quit;
         }
     };
@@ -864,10 +937,16 @@ mod tests {
 
     #[test]
     fn the_command_line_never_has_mpv_answer_keys() {
-        let own = super::mpv_args("pipe", None);
+        let own = super::mpv_args("pipe", None, false);
         assert!(own.iter().any(|x| x == "--focus-on=never"));
         assert!(!own.iter().any(|x| x.starts_with("--wid")));
-        let args = super::mpv_args("pipe", Some(4242));
+        // For older mpv versions without the newer options.
+        let compat = super::mpv_args("pipe", None, true);
+        assert!(!compat
+            .iter()
+            .any(|x| x.starts_with("--focus-on") || x.starts_with("--macos-app")));
+        assert!(compat.iter().any(|x| x == "--fs"));
+        let args = super::mpv_args("pipe", Some(4242), false);
         assert!(!args.iter().any(|x| x == "--fs"));
         for a in [
             "--wid=4242",

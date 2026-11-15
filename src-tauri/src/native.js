@@ -21,8 +21,10 @@
  * While mpv plays inside the window (the app sets window.__FREEX_MPV_EMBEDDED__), the keyboard
  * still belongs to the web view, so every key goes to mpv instead of the page.
  *
- * Ctrl+Shift+T (Cmd+Shift+T on macOS) switches to the TV mode. In the TV mode's own window
- * (window.__FREEX_TV__, set by tv_bridge.js) Esc belongs to the interface (Back of the remote).
+ * Ctrl+Shift+T (Cmd+Shift+T on macOS) switches to the TV mode; Ctrl+, (Cmd+,) opens the app's own
+ * settings window (with a remote: the TV interface's Settings → FreeX Desktop). In the TV mode's own window
+ * (window.__FREEX_TV__, set by tv_bridge.js) Esc belongs to the interface (Back of the remote)
+ * and F11 does nothing (the window is full screen by design).
  */
 (() => {
     "use strict";
@@ -101,9 +103,16 @@
         if (e.defaultPrevented) return;
         const ctrl = e.ctrlKey || e.metaKey;
         const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+        const invoke = (cmd) => {
+            const tauri = window.__TAURI__;
+            if (tauri && tauri.core) tauri.core.invoke(cmd).catch(() => null);
+        };
         if (key === "F11") {
             e.preventDefault();
-            toggleFullscreen();
+            if (!window.__FREEX_TV__) toggleFullscreen();
+        } else if (ctrl && !e.shiftKey && !e.altKey && key === ",") {
+            e.preventDefault();
+            invoke("settings_open");
         } else if (ctrl && e.shiftKey && !e.altKey && key === "t") {
             e.preventDefault();
             const tauri = window.__TAURI__;

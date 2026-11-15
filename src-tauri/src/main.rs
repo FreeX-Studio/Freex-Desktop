@@ -18,8 +18,10 @@
 //! any file in mpv inside the app window without conversion, media keys, real full screen (F11),
 //! a dark title bar, no browser menus or shortcuts, and a single running instance.
 //!
-//! On Windows there is also a TV mode (tv.rs): the interface of the FreeX TV apps, full screen,
-//! for a remote control, with mpv as its player. `--tv` starts the app in it.
+//! There is also a TV mode (tv.rs): the interface of the FreeX TV apps, full screen, for a remote
+//! control, with mpv as its player. `--tv` starts the app in it. What belongs to this PC (TV mode,
+//! start at login, player, server) is set in the app's own settings window (settings.rs), not on
+//! a server.
 
 // No console window in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -27,6 +29,7 @@
 mod autostart;
 mod mpv;
 mod server;
+mod settings;
 mod store;
 mod tv;
 
@@ -63,7 +66,7 @@ fn main() {
     let app = tauri::Builder::default()
         // A second start just brings the open window to the front.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if wants_tv(&args) && tv::available() {
+            if wants_tv(&args) && tv::ready(app) {
                 if let Err(e) = tv::enter(app) {
                     eprintln!("FreeX Desktop: no TV mode: {e}");
                     show_main(app);
@@ -85,6 +88,9 @@ fn main() {
             mpv::mpv_stop,
             mpv::mpv_key,
             tv::tv_enter,
+            tv::tv_leave,
+            settings::settings_open,
+            settings::app_quit,
             tv::tv_player,
             tv::tv_call,
             autostart::autostart_get,
@@ -93,7 +99,8 @@ fn main() {
         .setup(|app| {
             let config = app.path().app_config_dir()?;
             app.manage(AppState::new(config.join("settings.json")));
-            let tv_start = wants_tv(&std::env::args().collect::<Vec<_>>()) && tv::available();
+            let tv_start =
+                wants_tv(&std::env::args().collect::<Vec<_>>()) && tv::ready(app.handle());
             create_main_window(app.handle(), !tv_start)?;
             if tv_start {
                 if let Err(e) = tv::enter(app.handle()) {
@@ -133,6 +140,14 @@ fn main() {
             event: WindowEvent::Destroyed,
             ..
         } if label == tv::UI => tv::leave(app),
+        // The settings window closed: the keyboard (remote) goes back to the TV interface.
+        RunEvent::WindowEvent {
+            label,
+            event: WindowEvent::Destroyed,
+            ..
+        } if label == settings::LABEL => {
+            tv::focus(app);
+        }
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => show_main(app),
         RunEvent::Exit => {
@@ -246,7 +261,7 @@ fn create_main_window(app: &AppHandle, show: bool) -> tauri::Result<()> {
     Ok(())
 }
 
-fn save_geometry(app: &AppHandle) {
+pub(crate) fn save_geometry(app: &AppHandle) {
     let (Some(window), Some(state)) = (app.get_webview_window("main"), app.try_state::<AppState>())
     else {
         return;
@@ -334,7 +349,7 @@ fn tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         None::<&str>,
     )?));
-    if tv::available() {
+    if tv::ready(app) {
         let on = app.try_state::<AppState>().is_some_and(|s| s.tv.active());
         items.push(Box::new(MenuItem::with_id(
             app,
@@ -348,6 +363,13 @@ fn tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             None::<&str>,
         )?));
     }
+    items.push(Box::new(MenuItem::with_id(
+        app,
+        "settings",
+        tr("Einstellungen …", "Settings …"),
+        true,
+        None::<&str>,
+    )?));
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(MenuItem::with_id(
         app,
@@ -385,6 +407,11 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
                     }
                 }
                 "tv-leave" => tv::leave(app),
+                "settings" => {
+                    if let Err(e) = settings::open(app) {
+                        eprintln!("FreeX Desktop: no settings window: {e}");
+                    }
+                }
                 "servers" => {
                     tv::leave(app);
                     show_main(app);

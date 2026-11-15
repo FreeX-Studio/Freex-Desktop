@@ -1,0 +1,85 @@
+<!doctype html>
+<!--
+  ~ Copyright (c) 2026 MirraNET, Niklas Linz. All rights reserved.
+  ~
+  ~ This file is part of the MirraNET project and is licensed under the
+  ~ GNU Lesser General Public License v3.0 (LGPLv3).
+  ~
+  ~ You may use, distribute and modify this code under the terms
+  ~ of the LGPLv3 license. You should have received a copy of the
+  ~ license along with this file. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>
+  ~ or contact: niklas.linz@mirranet.de
+  -->
+<!-- The app's own settings (src-tauri/src/settings.rs): what is set for this PC, not on a server. -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FreeX</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<main class="app-settings">
+    <header class="head">
+        <img src="logo.svg" alt="">
+        <div>
+            <h1 data-t="Settings"></h1>
+            <div class="muted" data-t="For this PC – stored in the app, not on the server."></div>
+        </div>
+    </header>
+
+    <div class="error" id="error" role="alert" hidden></div>
+
+    <section class="card" id="tv-section" hidden>
+        <h2 data-t="Display"></h2>
+        <p class="muted" id="tv-state"></p>
+        <div class="actions">
+            <button class="btn primary" id="tv-enter" type="button" data-t="Switch to TV mode"></button>
+            <button class="btn primary" id="tv-leave" type="button" data-t="Back to the normal window"></button>
+        </div>
+        <label class="check">
+            <input type="checkbox" id="tv-autostart">
+            <span data-t="Start in TV mode at login"></span>
+        </label>
+    </section>
+
+    <section class="card">
+        <h2 data-t="Player"></h2>
+        <div class="segmented" role="radiogroup" id="player">
+            <button type="button" role="radio" data-player="builtin" data-t="FreeX player"></button>
+            <button type="button" role="radio" data-player="mpv">mpv</button>
+        </div>
+        <p class="hint" id="player-hint"></p>
+        <label class="check mpv-only" id="embed-row">
+            <input type="checkbox" id="mpv-embed">
+            <span data-t="Play inside the FreeX window"></span>
+        </label>
+        <label class="check mpv-only">
+            <input type="checkbox" id="mpv-fullscreen">
+            <span data-t="Start mpv in full screen"></span>
+        </label>
+    </section>
+
+    <section class="card">
+        <h2 data-t="Server"></h2>
+        <p class="muted" id="server"></p>
+        <div class="actions">
+            <button class="btn" id="servers" type="button" data-t="Switch server"></button>
+        </div>
+        <label class="check">
+            <input type="checkbox" id="auto-connect">
+            <span data-t="Connect to the last server on start"></span>
+        </label>
+    </section>
+
+    <footer class="foot">
+        <span class="muted" id="version"></span>
+        <span class="grow"></span>
+        <button class="btn danger" id="quit" type="button" data-t="Quit FreeX"></button>
+        <button class="btn" id="close" type="button" data-t="Close"></button>
+    </footer>
+</main>
+<script src="settings.js"></script>
+</body>
+</html>
