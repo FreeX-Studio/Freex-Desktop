@@ -130,7 +130,10 @@ Updates install over the old version and keep all settings.
   not on the server; the window works with a remote control too (arrows, OK, Back).
 - **Switch server:** the tray menu (one click per server), account menu → *Switch server*, *Settings → FreeX
   Desktop*, or the sign-in page. The tray menu also works when a server is unreachable.
-- **Player:** the app's settings window, *Settings → FreeX Desktop* in FreeX Web, or the app settings below the
+- **Client options in FreeX Web:** while signed in, *Settings → Client options* (also in the account menu) switches
+  to the TV mode, opens the app's settings window and sets the player. Like the settings window, it stores
+  everything in the app on this PC, not on the server.
+- **Player:** the app's settings window, *Settings → Client options* in FreeX Web, or the app settings below the
   server list. *FreeX player* is the player
   of FreeX Web with skip intro, up next and Watch Together. *mpv* plays every file directly; when an episode has
   played to the end, the next one starts after a short countdown. Watch Together always uses the FreeX player.
