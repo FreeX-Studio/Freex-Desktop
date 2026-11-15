@@ -203,6 +203,8 @@ fn grant<R: Runtime>(app: &AppHandle<R>, state: &AppState, origin: &str) -> Resu
         .permission("allow-mpv-stop")
         .permission("allow-mpv-key")
         .permission("allow-tv-enter")
+        .permission("allow-autostart-get")
+        .permission("allow-autostart-set")
         .permission("core:event:allow-listen")
         .permission("core:event:allow-unlisten")
         .permission("core:window:allow-set-fullscreen")
