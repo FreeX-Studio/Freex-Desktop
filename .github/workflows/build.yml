@@ -76,7 +76,7 @@ jobs:
             DEB_VERSION="$VERSION+$(date -u +%Y%m%d%H%M).git${GITHUB_SHA::7}"
           fi
           packaging/deb/build-deb.sh "$DEB_VERSION" src-tauri/target/release/freex-desktop dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: linux
           path: dist/*.deb
@@ -101,7 +101,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: .download-cache
           key: freex-build-${{ hashFiles('packaging/windows/build.sh', 'packaging/msix/build.sh') }}
@@ -114,7 +114,7 @@ jobs:
             [ -n "${!v}" ] || unset "$v"
           done
           packaging/msix/build.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: windows
           path: |
@@ -137,7 +137,7 @@ jobs:
         run: |
           packaging/tv-ui.sh
           packaging/macos/build.sh "$GITHUB_RUN_NUMBER"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: macos
           path: |
@@ -152,7 +152,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
