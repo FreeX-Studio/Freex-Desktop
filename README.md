@@ -190,6 +190,18 @@ The last stage builds the Mac app on the Jenkins node `Spark` and archives its `
 the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `MACOS_NOTARY_PROFILE` (stored with
 `xcrun notarytool store-credentials`) the script signs and notarizes it, and Gatekeeper no longer asks.
 
+#### GitHub Actions
+
+Next to Jenkins, GitHub builds the same with the same scripts (`.github/workflows/build.yml`) on every push to `main`
+and every pull request: checks and tests, the `.deb` (on Ubuntu 22.04, so it runs on Debian 12+ and Ubuntu 22.04+),
+the Windows setup and `.msix`, and the Mac app (signed ad hoc). The files are in the run's *Artifacts*.
+
+A release is made by hand: *Actions → Release → Run workflow*, with the version (`X.Y.Z`; empty: the current
+version if it has no tag yet, otherwise the next patch version). The workflow sets the version in
+`src-tauri/Cargo.toml`, commits and tags it (`vX.Y.Z`) and starts the build for the tag, which publishes the GitHub
+release with all files. For the Store package, set the repository variables `MSIX_IDENTITY`, `MSIX_PUBLISHER` and
+`MSIX_PUBLISHER_NAME` (*Settings → Secrets and variables → Actions → Variables*), as in Jenkins below.
+
 #### Microsoft Store
 
 `packaging/msix/build.sh` packs the Windows app as laid out for the installer (`dist/windows`) into an unsigned MSIX

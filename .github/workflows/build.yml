@@ -1,0 +1,171 @@
+# Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3.
+#
+# GitHub build of FreeX Desktop, next to the Jenkins build (Jenkinsfile) and with the same
+# scripts: checks and tests, the Debian package, the Windows installer and the MSIX package for
+# the Microsoft Store (both cross-compiled on Linux), and the macOS app. A tag v* (made by the
+# Release workflow) publishes them as a GitHub release.
+#
+# Repository variables (Settings > Secrets and variables > Actions > Variables) for the Store
+# package, from Partner Center > Product identity: MSIX_IDENTITY, MSIX_PUBLISHER,
+# MSIX_PUBLISHER_NAME (see packaging/msix/build.sh).
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  # mpv, the WebView2 bootstrapper and makemsix, kept between runs (actions/cache).
+  FREEX_DOWNLOAD_CACHE: ${{ github.workspace }}/.download-cache
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: TV interface (FreeX-TV-Apps)
+        run: packaging/tv-ui.sh
+      - name: rustfmt, Clippy, tests
+        working-directory: src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+  linux:
+    needs: check
+    # The oldest supported Ubuntu: the package then runs on Debian 12+ and Ubuntu 22.04+ (glibc).
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+              librsvg2-dev librsvg2-bin dpkg binutils
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: App and Debian package
+        run: |
+          packaging/tv-ui.sh
+          (cd src-tauri && cargo build --release --locked --features custom-protocol)
+          VERSION="$(sed -n 's/^version *= *"\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
+          # A release has the plain version; other builds one of their own, as in Jenkins.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            DEB_VERSION="$VERSION"
+          else
+            DEB_VERSION="$VERSION+$(date -u +%Y%m%d%H%M).git${GITHUB_SHA::7}"
+          fi
+          packaging/deb/build-deb.sh "$DEB_VERSION" src-tauri/target/release/freex-desktop dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.deb
+          if-no-files-found: error
+
+  windows:
+    needs: check
+    runs-on: ubuntu-24.04
+    env:
+      MSIX_IDENTITY: ${{ vars.MSIX_IDENTITY }}
+      MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+      MSIX_PUBLISHER_NAME: ${{ vars.MSIX_PUBLISHER_NAME }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 nsis librsvg2-bin unzip
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: actions/cache@v4
+        with:
+          path: .download-cache
+          key: freex-build-${{ hashFiles('packaging/windows/build.sh', 'packaging/msix/build.sh') }}
+      - name: Installer
+        run: packaging/windows/build.sh
+      - name: MSIX package for the Microsoft Store
+        run: |
+          # Empty repository variables: the script's placeholders (the Store would refuse those).
+          for v in MSIX_IDENTITY MSIX_PUBLISHER MSIX_PUBLISHER_NAME; do
+            [ -n "${!v}" ] || unset "$v"
+          done
+          packaging/msix/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/freex-desktop-*-setup.exe
+            dist/freex-desktop-*-x64.msix
+          if-no-files-found: error
+
+  macos:
+    needs: check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: App, .dmg and .zip (signed ad hoc)
+        run: |
+          packaging/tv-ui.sh
+          packaging/macos/build.sh "$GITHUB_RUN_NUMBER"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            dist/*-macos.dmg
+            dist/*-macos.zip
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l dist
+          notes="FreeX Desktop ${TAG#v}
+
+          - **Windows:** \`freex-desktop-${TAG#v}-setup.exe\` (installer with mpv); \`.msix\` is the package for the Microsoft Store
+          - **Linux (Debian, Ubuntu):** the \`.deb\`, or from the APT repository apt.mirranet.de
+          - **macOS:** the \`.dmg\` (Apple silicon and Intel, macOS 11+)"
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "FreeX Desktop ${TAG#v}" \
+              --notes "$notes" --generate-notes --verify-tag
