@@ -29,8 +29,16 @@ tauri-plugin-single-instance = "2"
 raw-window-handle = "0.6"
 
 [target.'cfg(windows)'.dependencies]
-# Gives the keyboard to mpv inside the app window (same version as Tauri uses).
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
+# Gives the keyboard to mpv inside the app window (same version as Tauri uses); the startup
+# task of the Store app (MSIX package).
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Storage_Packaging_Appx",
+    "ApplicationModel",
+    "ApplicationModel_Activation",
+] }
 
 [features]
 # Set by release builds: serves the bundled ui/ instead of a dev server.

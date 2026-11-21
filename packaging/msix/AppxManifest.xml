@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3. -->
+<!--
+  Manifest of the MSIX package for the Microsoft Store (packaging/msix/build.sh fills in the
+  [[...]] values). The identity must match the app reserved in Partner Center
+  (Product identity: Package/Identity/Name, Package/Identity/Publisher, PublisherDisplayName).
+
+  The app is a full-trust desktop app (runFullTrust). The startup task "FreeXTV" is the Store
+  app's "Start in TV mode at login" (src-tauri/src/autostart.rs): off until the user switches
+  it on in the app.
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap desktop rescap">
+
+  <Identity Name="[[identity]]" Publisher="[[publisher]]" Version="[[version]]" ProcessorArchitecture="x64"/>
+
+  <Properties>
+    <DisplayName>FreeX Desktop</DisplayName>
+    <PublisherDisplayName>[[publisher_name]]</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Watch the movies and shows of your FreeX Media Server</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 2004 or later. WebView2 is part of Windows 11 and of current Windows 10. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/>
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us"/>
+    <Resource Language="de-de"/>
+  </Resources>
+
+  <Applications>
+    <Application Id="FreeX" Executable="freex-desktop.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+          DisplayName="FreeX Desktop"
+          Description="Watch the movies and shows of your FreeX Media Server"
+          BackgroundColor="transparent"
+          Square150x150Logo="Assets\Square150x150Logo.png"
+          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" ShortName="FreeX"/>
+      </uap:VisualElements>
+      <Extensions>
+        <desktop:Extension Category="windows.startupTask" Executable="freex-desktop.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="FreeXTV" Enabled="false" DisplayName="FreeX TV"/>
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient"/>
+    <!-- FreeX servers in the home network. -->
+    <Capability Name="privateNetworkClientServer"/>
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+</Package>

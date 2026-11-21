@@ -14,7 +14,9 @@
 //! system does it for the current user:
 //!
 //! - Windows: the value "FreeX TV" under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
-//!   (the installer's option "Start in TV mode at login" writes the same value)
+//!   (the installer's option "Start in TV mode at login" writes the same value). The Store app
+//!   (MSIX package) cannot use that key; it has the startup task "FreeXTV" in its manifest
+//!   (packaging/msix), which starts it at login and is switched with the StartupTask API.
 //! - Linux: `~/.config/autostart/freex-desktop-tv.desktop` (XDG autostart)
 //! - macOS: the launch agent `~/Library/LaunchAgents/de.mirranet.freex.desktop.tv.plist`
 
@@ -46,11 +48,17 @@ fn reg(args: &[&str]) -> std::io::Result<std::process::Output> {
 
 #[cfg(windows)]
 pub fn enabled() -> bool {
+    if packaged::is_packaged() {
+        return packaged::enabled();
+    }
     reg(&["query", RUN_KEY, "/v", RUN_VALUE]).is_ok_and(|o| o.status.success())
 }
 
 #[cfg(windows)]
 pub fn set(on: bool) -> Result<(), String> {
+    if packaged::is_packaged() {
+        return packaged::set(on);
+    }
     let out = if on {
         let command = format!("\"{}\" --tv", exe()?.display());
         reg(&[
@@ -67,6 +75,67 @@ pub fn set(on: bool) -> Result<(), String> {
         Ok(())
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
+/// The Store app: runs from an MSIX package, starts at login through its startup task.
+#[cfg(windows)]
+pub mod packaged {
+    use windows::core::HSTRING;
+    use windows::ApplicationModel::Activation::ActivationKind;
+    use windows::ApplicationModel::{AppInstance, StartupTask, StartupTaskState};
+    use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+    use windows::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;
+
+    /// `TaskId` of the startup task in packaging/msix/AppxManifest.xml.
+    const TASK: &str = "FreeXTV";
+
+    /// The app runs from an MSIX package (the Store app), not from the installer.
+    pub fn is_packaged() -> bool {
+        let mut len = 0u32;
+        // Without a package: APPMODEL_ERROR_NO_PACKAGE; with one: the name does not fit.
+        unsafe { GetCurrentPackageFullName(&mut len, None) == ERROR_INSUFFICIENT_BUFFER }
+    }
+
+    /// The Store app was started by its startup task (at login): it starts in the TV mode, as
+    /// the installed app does with `--tv`.
+    pub fn started_at_login() -> bool {
+        is_packaged()
+            && AppInstance::GetActivatedEventArgs()
+                .and_then(|a| a.Kind())
+                .is_ok_and(|k| k == ActivationKind::StartupTask)
+    }
+
+    fn task() -> Result<StartupTask, String> {
+        StartupTask::GetAsync(&HSTRING::from(TASK))
+            .and_then(|op| op.join())
+            .map_err(|e| format!("startup task: {e}"))
+    }
+
+    pub fn enabled() -> bool {
+        task()
+            .and_then(|t| t.State().map_err(|e| e.to_string()))
+            .is_ok_and(|s| s == StartupTaskState::Enabled || s == StartupTaskState::EnabledByPolicy)
+    }
+
+    pub fn set(on: bool) -> Result<(), String> {
+        let task = task()?;
+        if !on {
+            return task.Disable().map_err(|e| e.to_string());
+        }
+        let state = task
+            .RequestEnableAsync()
+            .and_then(|op| op.join())
+            .map_err(|e| e.to_string())?;
+        match state {
+            StartupTaskState::Enabled | StartupTaskState::EnabledByPolicy => Ok(()),
+            // Only the user can switch it on again (Settings > Apps > Startup).
+            StartupTaskState::DisabledByUser => Err(
+                "switched off in the Windows settings (Apps > Startup); switch on FreeX TV there"
+                    .into(),
+            ),
+            _ => Err("not allowed on this PC (policy)".into()),
+        }
     }
 }
 
@@ -197,13 +266,14 @@ pub fn set(_on: bool) -> Result<(), String> {
 
 // ---------------------------------------------------------------------------- commands
 
+// Async: the Store app waits for the StartupTask API there, which must not block the window.
 #[tauri::command]
-pub fn autostart_get() -> bool {
+pub async fn autostart_get() -> bool {
     enabled()
 }
 
 #[tauri::command]
-pub fn autostart_set(on: bool) -> Result<bool, String> {
+pub async fn autostart_set(on: bool) -> Result<bool, String> {
     set(on)?;
     Ok(enabled())
 }

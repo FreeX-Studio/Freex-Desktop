@@ -53,6 +53,14 @@ fn wants_tv(args: &[String]) -> bool {
     args.iter().any(|a| a == "--tv")
 }
 
+/// The Store app was started by its startup task (it gets no `--tv`, see autostart.rs).
+fn started_at_login() -> bool {
+    #[cfg(windows)]
+    return autostart::packaged::started_at_login();
+    #[cfg(not(windows))]
+    false
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     linux_environment();
@@ -99,8 +107,8 @@ fn main() {
         .setup(|app| {
             let config = app.path().app_config_dir()?;
             app.manage(AppState::new(config.join("settings.json")));
-            let tv_start =
-                wants_tv(&std::env::args().collect::<Vec<_>>()) && tv::ready(app.handle());
+            let tv_start = (wants_tv(&std::env::args().collect::<Vec<_>>()) || started_at_login())
+                && tv::ready(app.handle());
             if tv_start {
                 // Started in the TV mode: only its windows, no normal window behind them. Once the
                 // app runs (its windows need the running event loop to get a native window for

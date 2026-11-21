@@ -9,9 +9,14 @@
 //
 //   sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev \
 //       libayatana-appindicator3-dev librsvg2-dev librsvg2-bin dpkg binutils \
-//       gcc-mingw-w64-x86-64 nsis curl unzip
+//       gcc-mingw-w64-x86-64 nsis curl unzip git cmake clang
 //
-// Artifacts in dist/: the .deb, the setup .exe and the plain Windows app, and from Spark the
+// (cmake 3.29+ and clang build makemsix once, for the Store package; see packaging/msix/build.sh.
+// The package identity from Partner Center comes from the Global properties MSIX_IDENTITY,
+// MSIX_PUBLISHER and MSIX_PUBLISHER_NAME.)
+//
+// Artifacts in dist/: the .deb, the setup .exe, the .msix for the Microsoft Store and the plain
+// Windows app, and from Spark the
 // .dmg and .zip of the Mac app. Spark should only take jobs that ask for it (node setting
 // "Usage: Only build jobs with label expressions matching this node"), so `agent any` does not
 // put the Linux stages on the Mac.
@@ -71,6 +76,9 @@ pipeline {
         stage('Windows') {
             steps {
                 sh 'packaging/windows/build.sh'
+                // The same app as an MSIX package for the Microsoft Store (unsigned; to upload in
+                // Partner Center, the Store signs it).
+                sh 'packaging/msix/build.sh'
             }
         }
 
@@ -139,7 +147,7 @@ EOF
 
     post {
         success {
-            archiveArtifacts artifacts: 'dist/*.deb, dist/freex-desktop-*-setup.exe, dist/freex-desktop.exe, dist/WebView2Loader.dll', fingerprint: true
+            archiveArtifacts artifacts: 'dist/*.deb, dist/freex-desktop-*-setup.exe, dist/freex-desktop-*-x64.msix, dist/freex-desktop.exe, dist/WebView2Loader.dll', fingerprint: true
         }
     }
 }

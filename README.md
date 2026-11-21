@@ -79,6 +79,11 @@ Microsoft Edge WebView2 Runtime if it is missing (only needed on older Windows 1
 > file. Click **More info** and then **Run anyway** to install. (A signed installer is planned; even then, SmartScreen
 > may warn for new versions until they have been downloaded often enough.)
 
+**Windows, Microsoft Store:** every build also makes `freex-desktop-<version>-x64.msix`, the same app with mpv as
+an MSIX package for the Store. The Store signs it on publishing, so the Store version starts without any SmartScreen
+warning. It needs Windows 10 2004 or later; "Start in TV mode at login" is a startup task there, which can also be
+switched in Windows under *Settings → Apps → Startup*.
+
 **Linux (Debian, Ubuntu):** install from the MirraNET APT repository at `apt.mirranet.de` (Debian 12+, Ubuntu
 22.04+). First import its signing key, then add the repository and install; every new build arrives with
 `sudo apt upgrade`:
@@ -158,7 +163,7 @@ fit into the same Jenkins as the server; the macOS version is built on a Mac:
 
 ```bash
 sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-    librsvg2-dev librsvg2-bin dpkg gcc-mingw-w64-x86-64 nsis curl unzip
+    librsvg2-dev librsvg2-bin dpkg gcc-mingw-w64-x86-64 nsis curl unzip git cmake clang
 rustup target add x86_64-pc-windows-gnu
 
 # Linux: the app and the Debian package
@@ -168,6 +173,7 @@ packaging/deb/build-deb.sh 1.1.1 src-tauri/target/release/freex-desktop dist
 # Windows (cross-compiled): the app and the installer
 packaging/windows/build.sh            # dist/freex-desktop-<version>-setup.exe
 packaging/windows/build.sh --app      # only dist/freex-desktop.exe
+packaging/msix/build.sh               # afterwards: dist/freex-desktop-<version>-x64.msix (Microsoft Store)
 
 # macOS (on a Mac with Xcode or the Command Line Tools): universal app, .dmg and .zip
 packaging/macos/build.sh
@@ -176,13 +182,36 @@ packaging/macos/build.sh
 The Windows script downloads mpv and Microsoft's WebView2 bootstrapper once into `~/.cache/freex-build`; set
 `MPV_SHA256` and `WEBVIEW2_SHA256` to pin them. A distribution toolchain without the Windows standard library but
 with `rust-src` also works (the script then builds the standard library from source). The `Jenkinsfile` checks
-(rustfmt, Clippy), tests and builds both and archives the `.deb`, the setup and the plain Windows app. Every build
+(rustfmt, Clippy), tests and builds both and archives the `.deb`, the setup, the `.msix` and the plain Windows app. Every build
 gets its own package version (`1.1.1+202611142030.gitabc1234`), and builds of `main` go into the APT repository with
 `packaging/apt/publish.sh` (set up in Jenkins with `APT_REPO`, `APT_HOST` and optionally `APT_SUITE`). The package
 asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
 The last stage builds the Mac app on the Jenkins node `Spark` and archives its `.dmg` and `.zip`. Without settings
 the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `MACOS_NOTARY_PROFILE` (stored with
 `xcrun notarytool store-credentials`) the script signs and notarizes it, and Gatekeeper no longer asks.
+
+#### Microsoft Store
+
+`packaging/msix/build.sh` packs the Windows app as laid out for the installer (`dist/windows`) into an unsigned MSIX
+package with `makemsix` from Microsoft's [msix-packaging](https://github.com/microsoft/msix-packaging), which the
+script builds once into `~/.cache/freex-build` (needs git, cmake 3.29+ and clang). The manifest is
+`packaging/msix/AppxManifest.xml`: a full-trust desktop app (`runFullTrust`) with the startup task `FreeXTV` for
+"Start in TV mode at login".
+
+To publish:
+
+1. In [Partner Center](https://partner.microsoft.com/dashboard), reserve the app name and open *Product identity*.
+2. Set its values in Jenkins (*Manage Jenkins → System → Global properties*): `MSIX_IDENTITY` =
+   *Package/Identity/Name*, `MSIX_PUBLISHER` = *Package/Identity/Publisher* (`CN=…`), `MSIX_PUBLISHER_NAME` =
+   *Package/Properties/PublisherDisplayName*. Without them the package has placeholders and the Store refuses it.
+3. Upload the `.msix` of a build to a submission under *Packages*. `runFullTrust` is a restricted capability: give
+   as reason that FreeX Desktop is a desktop app that plays media with the bundled mpv.
+4. Every upload needs a higher version: raise `version` in `src-tauri/Cargo.toml` (the package gets
+   `<version>.0`, e.g. `1.2.0.0`; the Store wants the fourth number to be 0).
+
+To try the package before uploading, it must be signed with a certificate the PC trusts (e.g. a self-signed one with
+the same `CN=…` as `MSIX_PUBLISHER`, signed with `signtool` on Windows), or unpacked and registered in developer mode
+with `Add-AppxPackage -Register AppxManifest.xml`.
 
 ### Project structure
 
@@ -194,11 +223,12 @@ the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `M
 | `src-tauri/src/native.js` | Runs in every page: app instead of browser behaviour, keys for mpv |
 | `src-tauri/src/settings.rs` | The app's own settings window (TV mode, start at login, player, server) |
 | `src-tauri/src/tv.rs`, `tv_bridge.js` | TV mode: its windows, mpv for the TV interface, the `FreeXNative` bridge |
-| `src-tauri/src/autostart.rs` | Starting in the TV mode at login (Run key, XDG autostart, launch agent) |
+| `src-tauri/src/autostart.rs` | Starting in the TV mode at login (Run key or the Store app's startup task, XDG autostart, launch agent) |
 | `src-tauri/src/store.rs` | `settings.json` |
 | `src-tauri/icons/` | App icons; `app-icon.svg` is the source of the PNG icons, `app-icon-macos.svg` of `icon.icns` |
 | `ui/` | The server picker and the settings window (plain HTML, CSS and JavaScript); `ui/tv/` comes from FreeX-TV-Apps at build time |
 | `packaging/windows/` | Installer (NSIS) and build script |
+| `packaging/msix/` | MSIX package for the Microsoft Store: manifest and build script |
 | `packaging/macos/` | `Info.plist` and build script of the Mac app (`.app`, `.dmg`) |
 | `packaging/deb/` | Debian package: menu entry, AppStream data, build script |
 | `packaging/apt/` | Publishing to the MirraNET APT repository (same script as FreeX Media Server) |
