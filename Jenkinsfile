@@ -1,15 +1,10 @@
 // Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3.
 //
 // Jenkins build of FreeX Desktop on a Linux agent: checks and tests, the Linux app with its
-<<<<<<< Updated upstream
 // Debian package, the Windows app (cross-compiled) with its installer. The macOS app is built on
 // the Mac node "Spark" (last stage). Releases go into the MirraNET APT repository from GitHub
 // Actions (.github/workflows/build.yml, job apt), not from here. For a package that installs on
 // Debian 12+ and Ubuntu 22.04+, the agent itself should be Debian 12 or Ubuntu 22.04 (glibc, see packaging/deb/build-deb.sh).
-=======
-// Debian package, the Windows app (cross-compiled) with its installer. The macOS app is built on the Mac node "Spark" (last stage). For a package that installs on Debian 12+ and Ubuntu 22.04+,
-// the agent itself should be Debian 12 or Ubuntu 22.04 (glibc, see packaging/deb/build-deb.sh).
->>>>>>> Stashed changes
 //
 // The agent needs, besides rustup and the Windows tools listed in packaging/windows/build.sh:
 //
@@ -90,11 +85,7 @@ pipeline {
 
         // The macOS app on the Mac node "Spark" (own workspace there). It needs Xcode or the
         // Command Line Tools and rustup in the home of the Jenkins user on Spark. Comes last, so
-<<<<<<< Updated upstream
         // the other builds are archived even while the Mac is offline.
-=======
-        // the other artifacts are built even while the Mac is offline.
->>>>>>> Stashed changes
         stage('macOS') {
             agent { label 'Spark' }
             options {
