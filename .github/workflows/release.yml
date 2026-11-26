@@ -2,7 +2,7 @@
 #
 # One click in GitHub (Actions > Release > Run workflow): sets the version in
 # src-tauri/Cargo.toml, commits and tags it, then starts the Build workflow for the tag, which
-# builds everything and publishes the GitHub release.
+# builds everything and publishes the GitHub release (and the .deb to apt.mirranet.de).
 name: Release
 
 on:

@@ -183,8 +183,13 @@ The Windows script downloads mpv and Microsoft's WebView2 bootstrapper once into
 `MPV_SHA256` and `WEBVIEW2_SHA256` to pin them. A distribution toolchain without the Windows standard library but
 with `rust-src` also works (the script then builds the standard library from source). The `Jenkinsfile` checks
 (rustfmt, Clippy), tests and builds both and archives the `.deb`, the setup, the `.msix` and the plain Windows app. Every build
+<<<<<<< Updated upstream
 gets its own package version (`1.1.1+202611142030.gitabc1234`); the APT repository gets only releases, from GitHub
 Actions (below). The package asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
+=======
+gets its own package version (`1.1.1+202611142030.gitabc1234`). The package
+asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
+>>>>>>> Stashed changes
 The last stage builds the Mac app on the Jenkins node `Spark` and archives its `.dmg` and `.zip`. Without settings
 the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `MACOS_NOTARY_PROFILE` (stored with
 `xcrun notarytool store-credentials`) the script signs and notarizes it, and Gatekeeper no longer asks.
@@ -198,10 +203,16 @@ the Windows setup and `.msix`, and the Mac app (signed ad hoc). The files are in
 A release is made by hand: *Actions → Release → Run workflow*, with the version (`X.Y.Z`; empty: the current
 version if it has no tag yet, otherwise the next patch version). The workflow sets the version in
 `src-tauri/Cargo.toml`, commits and tags it (`vX.Y.Z`) and starts the build for the tag, which publishes the GitHub
+<<<<<<< Updated upstream
 release with all files, and puts the `.deb` into the APT repository `apt.mirranet.de` (job `apt`, with
 `packaging/apt/publish.sh` and reprepro on the repository server). It needs the secrets `APT_HOST`, `APT_PORT`,
 `APT_REPO`, `APT_SSH_KEY` and `APT_KNOWN_HOSTS`, set once as organization secrets of FreeX-Studio; without them the
 job skips publishing. For the Store package, set the repository variables `MSIX_IDENTITY`, `MSIX_PUBLISHER` and
+=======
+release with all files. The release's `.deb` also goes into the MirraNET APT repository (`apt.mirranet.de`, job
+`apt`), with the organization secrets `APT_HOST`, `APT_PORT`, `APT_REPO`, `APT_SSH_KEY` and `APT_KNOWN_HOSTS`;
+without them the job is skipped. For the Store package, set the repository variables `MSIX_IDENTITY`, `MSIX_PUBLISHER` and
+>>>>>>> Stashed changes
 `MSIX_PUBLISHER_NAME` (*Settings → Secrets and variables → Actions → Variables*), as in Jenkins below.
 
 #### Microsoft Store
@@ -245,7 +256,11 @@ with `Add-AppxPackage -Register AppxManifest.xml`.
 | `packaging/msix/` | MSIX package for the Microsoft Store: manifest and build script |
 | `packaging/macos/` | `Info.plist` and build script of the Mac app (`.app`, `.dmg`) |
 | `packaging/deb/` | Debian package: menu entry, AppStream data, build script |
+<<<<<<< Updated upstream
 | `packaging/apt/` | Publishing release packages to the MirraNET APT repository (run on the repository server) |
+=======
+| `packaging/apt/` | Publishing to the MirraNET APT repository (run on the repository server by the `apt` job) |
+>>>>>>> Stashed changes
 
 ### How it works
 
