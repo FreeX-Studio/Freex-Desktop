@@ -85,7 +85,7 @@ warning. It needs Windows 10 2004 or later; "Start in TV mode at login" is a sta
 switched in Windows under *Settings → Apps → Startup*.
 
 **Linux (Debian, Ubuntu):** install from the MirraNET APT repository at `apt.mirranet.de` (Debian 12+, Ubuntu
-22.04+). First import its signing key, then add the repository and install; every new build arrives with
+22.04+). First import its signing key, then add the repository and install; every new release arrives with
 `sudo apt upgrade`:
 
 ```bash
@@ -183,9 +183,8 @@ The Windows script downloads mpv and Microsoft's WebView2 bootstrapper once into
 `MPV_SHA256` and `WEBVIEW2_SHA256` to pin them. A distribution toolchain without the Windows standard library but
 with `rust-src` also works (the script then builds the standard library from source). The `Jenkinsfile` checks
 (rustfmt, Clippy), tests and builds both and archives the `.deb`, the setup, the `.msix` and the plain Windows app. Every build
-gets its own package version (`1.1.1+202611142030.gitabc1234`), and builds of `main` go into the APT repository with
-`packaging/apt/publish.sh` (set up in Jenkins with `APT_REPO`, `APT_HOST` and optionally `APT_SUITE`). The package
-asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
+gets its own package version (`1.1.1+202611142030.gitabc1234`); the APT repository gets only releases, from GitHub
+Actions (below). The package asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
 The last stage builds the Mac app on the Jenkins node `Spark` and archives its `.dmg` and `.zip`. Without settings
 the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `MACOS_NOTARY_PROFILE` (stored with
 `xcrun notarytool store-credentials`) the script signs and notarizes it, and Gatekeeper no longer asks.
@@ -199,7 +198,10 @@ the Windows setup and `.msix`, and the Mac app (signed ad hoc). The files are in
 A release is made by hand: *Actions → Release → Run workflow*, with the version (`X.Y.Z`; empty: the current
 version if it has no tag yet, otherwise the next patch version). The workflow sets the version in
 `src-tauri/Cargo.toml`, commits and tags it (`vX.Y.Z`) and starts the build for the tag, which publishes the GitHub
-release with all files. For the Store package, set the repository variables `MSIX_IDENTITY`, `MSIX_PUBLISHER` and
+release with all files, and puts the `.deb` into the APT repository `apt.mirranet.de` (job `apt`, with
+`packaging/apt/publish.sh` and reprepro on the repository server). It needs the secrets `APT_HOST`, `APT_PORT`,
+`APT_REPO`, `APT_SSH_KEY` and `APT_KNOWN_HOSTS`, set once as organization secrets of FreeX-Studio; without them the
+job skips publishing. For the Store package, set the repository variables `MSIX_IDENTITY`, `MSIX_PUBLISHER` and
 `MSIX_PUBLISHER_NAME` (*Settings → Secrets and variables → Actions → Variables*), as in Jenkins below.
 
 #### Microsoft Store
@@ -243,7 +245,7 @@ with `Add-AppxPackage -Register AppxManifest.xml`.
 | `packaging/msix/` | MSIX package for the Microsoft Store: manifest and build script |
 | `packaging/macos/` | `Info.plist` and build script of the Mac app (`.app`, `.dmg`) |
 | `packaging/deb/` | Debian package: menu entry, AppStream data, build script |
-| `packaging/apt/` | Publishing to the MirraNET APT repository (same script as FreeX Media Server) |
+| `packaging/apt/` | Publishing release packages to the MirraNET APT repository (run on the repository server) |
 
 ### How it works
 
