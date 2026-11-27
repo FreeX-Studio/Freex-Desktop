@@ -23,7 +23,7 @@
 # rustc-1.91 and rust-1.91-src) also works: the standard library is then built from source.
 #
 # mpv and the WebView2 bootstrapper are downloaded once into a cache (FREEX_DOWNLOAD_CACHE,
-# default ~/.cache/freex-build). Set MPV_SHA256 / WEBVIEW2_SHA256 (e.g. in the Jenkins job) to
+# default ~/.cache/freex-build). Set MPV_SHA256 / WEBVIEW2_SHA256 (e.g. in the build workflow) to
 # pin the downloaded files.
 
 set -euo pipefail

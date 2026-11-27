@@ -19,7 +19,8 @@
 # (dist/windows: freex-desktop.exe, WebView2Loader.dll, mpv\, licences); run that first.
 #
 # The package identity comes from Partner Center (the app's page > Product identity) and must
-# match it, or the Store refuses the upload. Set in the Jenkins job (Global properties) or here:
+# match it, or the Store refuses the upload. Set as repository variables in GitHub
+# (.github/workflows/build.yml) or here:
 #   MSIX_IDENTITY        Package/Identity/Name, e.g. 12345MirraNET.FreeXDesktop
 #   MSIX_PUBLISHER       Package/Identity/Publisher, e.g. CN=1A2B3C4D-...
 #   MSIX_PUBLISHER_NAME  Package/Properties/PublisherDisplayName, e.g. MirraNET

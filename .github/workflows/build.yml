@@ -1,8 +1,8 @@
 # Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3.
 #
-# GitHub build of FreeX Desktop, next to the Jenkins build (Jenkinsfile) and with the same
-# scripts: checks and tests, the Debian package, the Windows installer and the MSIX package for
-# the Microsoft Store (both cross-compiled on Linux), and the macOS app. A tag v* (made by the
+# Build of FreeX Desktop with the scripts in packaging/: checks and tests, the Debian package,
+# the Windows installer and the MSIX package for the Microsoft Store (both cross-compiled on
+# Linux), and the macOS app. A tag v* (made by the
 # Release workflow) publishes them as a GitHub release and the .deb in the MirraNET APT
 # repository (job apt; secrets APT_HOST, APT_PORT, APT_REPO, APT_SSH_KEY, APT_KNOWN_HOSTS).
 #
@@ -70,7 +70,7 @@ jobs:
           packaging/tv-ui.sh
           (cd src-tauri && cargo build --release --locked --features custom-protocol)
           VERSION="$(sed -n 's/^version *= *"\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
-          # A release has the plain version; other builds one of their own, as in Jenkins.
+          # A release has the plain version; other builds one of their own.
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             DEB_VERSION="$VERSION"
           else

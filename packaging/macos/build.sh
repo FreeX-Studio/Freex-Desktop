@@ -10,7 +10,7 @@
 # license along with this file. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>
 # or contact: niklas.linz@mirranet.de
 #
-# Builds FreeX Desktop for macOS on a Mac (Jenkins node "Spark"):
+# Builds FreeX Desktop for macOS on a Mac (GitHub Actions: macos-latest):
 #
 #   packaging/macos/build.sh [build number]
 #

@@ -13,8 +13,8 @@
 # Builds the Debian package (freex-desktop_<version>_amd64.deb):
 #   build-deb.sh <package version> <freex-desktop binary> <output directory>
 #
-# The package version may carry a build suffix (1.1.1+202611142030.gitabc1234, see the
-# Jenkinsfile); the AppStream data names the plain app version. The minimum libc6 version is
+# The package version may carry a build suffix (1.1.1+202611142030.gitabc1234, see
+# .github/workflows/build.yml); the AppStream data names the plain app version. The minimum libc6 version is
 # taken from the binary itself, so apt refuses the package on systems whose glibc is too old
 # instead of the app failing to start. The APT repository is meant for Debian 12+ and Ubuntu
 # 22.04+, so the build machine should not have a newer glibc than 2.35.

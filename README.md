@@ -158,8 +158,8 @@ Updates install over the old version and keep all settings.
 
 ## Building
 
-The app is built with [Tauri 2](https://tauri.app) (Rust). The Linux and Windows versions are built on Linux, so they
-fit into the same Jenkins as the server; the macOS version is built on a Mac:
+The app is built with [Tauri 2](https://tauri.app) (Rust). The Linux and Windows versions are built on Linux; the macOS
+version is built on a Mac. GitHub Actions builds all of them (below); by hand:
 
 ```bash
 sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
@@ -181,19 +181,17 @@ packaging/macos/build.sh
 
 The Windows script downloads mpv and Microsoft's WebView2 bootstrapper once into `~/.cache/freex-build`; set
 `MPV_SHA256` and `WEBVIEW2_SHA256` to pin them. A distribution toolchain without the Windows standard library but
-with `rust-src` also works (the script then builds the standard library from source). The `Jenkinsfile` checks
-(rustfmt, Clippy), tests and builds both and archives the `.deb`, the setup, the `.msix` and the plain Windows app. Every build
-gets its own package version (`1.1.1+202611142030.gitabc1234`); the APT repository gets only releases, from GitHub
-Actions (below). The package asks for the glibc version the binary needs; for Debian 12 and Ubuntu 22.04 the agent must not be newer than those.
-The last stage builds the Mac app on the Jenkins node `Spark` and archives its `.dmg` and `.zip`. Without settings
-the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `MACOS_NOTARY_PROFILE` (stored with
+with `rust-src` also works (the script then builds the standard library from source). The Debian package asks for
+the glibc version the binary needs, so a package for Debian 12 and Ubuntu 22.04 must be built on a system not newer
+than those. Without settings the Mac app is signed ad hoc; with `MACOS_SIGN_IDENTITY` (a Developer ID) and `MACOS_NOTARY_PROFILE` (stored with
 `xcrun notarytool store-credentials`) the script signs and notarizes it, and Gatekeeper no longer asks.
 
 #### GitHub Actions
 
-Next to Jenkins, GitHub builds the same with the same scripts (`.github/workflows/build.yml`) on every push to `main`
-and every pull request: checks and tests, the `.deb` (on Ubuntu 22.04, so it runs on Debian 12+ and Ubuntu 22.04+),
-the Windows setup and `.msix`, and the Mac app (signed ad hoc). The files are in the run's *Artifacts*.
+GitHub builds everything with the scripts above (`.github/workflows/build.yml`) on every push to `main` and every
+pull request: checks and tests, the `.deb` (on Ubuntu 22.04, so it runs on Debian 12+ and Ubuntu 22.04+),
+the Windows setup and `.msix`, and the Mac app (signed ad hoc). The files are in the run's *Artifacts*; builds that
+are no release get their own package version (`1.2.1+202611142030.gitabc1234`).
 
 A release is made by hand: *Actions → Release → Run workflow*, with the version (`X.Y.Z`; empty: the current
 version if it has no tag yet, otherwise the next patch version). The workflow sets the version in
@@ -202,7 +200,7 @@ release with all files, and puts the `.deb` into the APT repository `apt.mirrane
 `packaging/apt/publish.sh` and reprepro on the repository server). It needs the secrets `APT_HOST`, `APT_PORT`,
 `APT_REPO`, `APT_SSH_KEY` and `APT_KNOWN_HOSTS`, set once as organization secrets of FreeX-Studio; without them the
 job skips publishing. For the Store package, set the repository variables `MSIX_IDENTITY`, `MSIX_PUBLISHER` and
-`MSIX_PUBLISHER_NAME` (*Settings → Secrets and variables → Actions → Variables*), as in Jenkins below.
+`MSIX_PUBLISHER_NAME` (*Settings → Secrets and variables → Actions → Variables*), see below.
 
 #### Microsoft Store
 
@@ -215,7 +213,8 @@ script builds once into `~/.cache/freex-build` (needs git, cmake 3.29+ and clang
 To publish:
 
 1. In [Partner Center](https://partner.microsoft.com/dashboard), reserve the app name and open *Product identity*.
-2. Set its values in Jenkins (*Manage Jenkins → System → Global properties*): `MSIX_IDENTITY` =
+2. Set its values as repository variables in GitHub (*Settings → Secrets and variables → Actions → Variables*):
+   `MSIX_IDENTITY` =
    *Package/Identity/Name*, `MSIX_PUBLISHER` = *Package/Identity/Publisher* (`CN=…`), `MSIX_PUBLISHER_NAME` =
    *Package/Properties/PublisherDisplayName*. Without them the package has placeholders and the Store refuses it.
 3. Upload the `.msix` of a build to a submission under *Packages*. `runFullTrust` is a restricted capability: give
